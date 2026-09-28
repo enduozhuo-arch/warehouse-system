@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>竹南冷凍倉儲系統 2.0</title>
+    <!-- 引入 Tailwind CSS 處理基礎排版 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* 
+        =========================================================
+        🎨 介面風格設定區 (妳可以在這裡隨意修改顏色！)
+        =========================================================
+        */
+        :root {
+            /* 🥬 主色調：充滿活力的蔬菜綠 */
+            --primary-color: #22c55e; /* 預設為明亮的綠色 */
+            --primary-hover: #16a34a; /* 滑鼠移過去的深綠色 */
+            --primary-light: #dcfce7; /* 淡淡的綠色背景 (用於提示) */
+            
+            /* 🏢 專業感配色：側邊欄與深色文字 */
+            --sidebar-bg: #1e293b;    /* 側邊導覽列的背景色 (深藍灰) */
+            --sidebar-text: #f8fafc;  /* 側邊導覽列的文字顏色 (近乎純白) */
+            
+            /* 📦 背景與卡片設計 */
+            --app-bg: #f4f7f6;        /* 整個網頁的背景色 (微灰白，讓卡片更立體) */
+            --card-bg: #ffffff;       /* 內容卡片的背景色 (純白) */
+            
+            /* ⚠️ 警告與防呆顏色 */
+            --warning-color: #f59e0b; /* 盤點或先進先出提示的橘黃色 */
+            --danger-color: #ef4444;  /* 確認扣除庫存的紅色按鈕 */
+            
+            /* 📐 版面尺寸 */
+            --sidebar-width: 260px;   /* 側邊欄的寬度 */
+        }
+
+        /* 系統基礎設定，套用變數 */
+        body {
+            background-color: var(--app-bg);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            display: flex;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        /* 隱藏未選中的標籤頁 */
+        .tab-content { 
+            display: none; 
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .tab-content.active { display: block; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 自訂樣式類別 (對應到上面的變數) */
+        .text-theme { color: var(--primary-color); }
+        .bg-theme { background-color: var(--primary-color); color: white; }
+        .bg-theme:hover { background-color: var(--primary-hover); }
+        .border-theme { border-color: var(--primary-color); }
+        
+        /* 表格樣式優化 */
+        th { background-color: #f8fafc; color: #475569; font-weight: 600; }
+        td, th { padding: 1rem; border-bottom: 1px solid #e2e8f0; }
+        tr:hover td { background-color: var(--primary-light); }
+    </style>
+</head>
+<body>
+
+    <aside style="width: var(--sidebar-width); background-color: var(--sidebar-bg); color: var(--sidebar-text);" class="flex-shrink-0 flex flex-col shadow-xl transition-all duration-300">
+        <div class="p-6 flex items-center gap-3 border-b border-gray-700">
+            <span class="text-3xl">🥬</span>
+            <div>
+                <h1 class="text-xl font-bold tracking-wide">竹南冷凍倉儲</h1>
+                <p class="text-xs text-gray-400 mt-1">智慧管理系統 2.0</p>
+            </div>
+        </div>
+        
+        <nav class="flex-1 p-4 space-y-2">
+            <!-- 導覽按鈕 -->
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors bg-white/10 font-medium">
+                <span>📊</span> 庫存總覽
+            </button>
+            <button onclick="switchTab('inbound')" id="nav-inbound" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-white/5 font-medium text-gray-300">
+                <span>📥</span> 進貨作業
+            </button>
+            <button onclick="switchTab('outbound')" id="nav-outbound" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-white/5 font-medium text-gray-300">
+                <span>📤</span> 出貨作業 (FIFO)
+            </button>
+            <button onclick="switchTab('inventory')" id="nav-inventory" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-white/5 font-medium text-gray-300">
+                <span>📋</span> 盤點與報廢
+            </button>
+        </nav>
+        
+        <div class="p-4 text-sm text-center text-gray-500 border-t border-gray-700">
+            維護者：第一組
+        </div>
+    </aside>
+
+    <main class="flex-1 p-8 overflow-y-auto w-full">
+        
+        <!-- 1. 庫存總覽畫面 -->
+        <section id="dashboard" class="tab-content active">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-800 flex items-center gap-2">
+                    📊 現行庫存總覽 <span class="text-sm font-normal text-gray-500 ml-2">掌握每顆蔬菜的去向 🥦🥕</span>
+                </h2>
+            </header>
+
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                <!-- 倉庫 1 卡片 -->
+                <div style="background-color: var(--card-bg);" class="rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="bg-blue-50 p-4 border-b border-blue-100 flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-blue-800 flex items-center gap-2">🏢 倉庫 1 <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full">主倉</span></h3>
+                    </div>
+                    <div class="overflow-x-auto p-4">
+                        <table class="w-full text-left text-sm">
+                            <thead>
+                                <tr>
+                                    <th>儲位</th>
+                                    <th>蔬果種類</th>
+                                    <th>數量(箱)</th>
+                                    <th>進貨時間</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wh1-table">
+                                <!-- JS 動態產生 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 倉庫 2 卡片 -->
+                <div style="background-color: var(--card-bg);" class="rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="bg-green-50 p-4 border-b border-green-100 flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-green-800 flex items-center gap-2">🏢 倉庫 2 <span class="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">副倉</span></h3>
+                    </div>
+                    <div class="overflow-x-auto p-4">
+                        <table class="w-full text-left text-sm">
+                            <thead>
+                                <tr>
+                                    <th>儲位</th>
+                                    <th>蔬果種類</th>
+                                    <th>數量(箱)</th>
+                                    <th>進貨時間</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wh2-table">
+                                <!-- JS 動態產生 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 進貨作業畫面 -->
+        <section id="inbound" class="tab-content">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-800">📥 進貨登記入庫</h2>
+                <p class="text-gray-500 mt-2">新鮮蔬菜 🍅 送達！請確實登記放置儲位。</p>
+            </header>
+
+            <div style="background-color: var(--card-bg);" class="rounded-2xl shadow-sm border border-gray-100 p-8 max-w-2xl">
+                <form id="inbound-form" onsubmit="handleInbound(event)" class="space-y-6">
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">🥬 蔬果種類：</label>
+                            <select id="in-item" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary-color)] outline-none transition-all" required>
+                                <option value="甘藍菜">甘藍菜</option>
+                                <option value="青江菜">青江菜</option>
+                                <option value="高麗菜">高麗菜</option>
+                                <option value="番茄">番茄</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">🏢 放置倉庫：</label>
+                            <select id="in-wh" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary-color)] outline-none transition-all" required>
+                                <option value="1">倉庫 1</option>
+                                <option value="2">倉庫 2</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">📍 放置儲位：</label>
+                            <input type="text" id="in-bin" required class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary-color)] outline-none transition-all uppercase" placeholder="例如: A-01">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">📦 進貨數量(箱)：</label>
+                            <input type="number" id="in-qty" required min="1" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--primary-color)] outline-none transition-all" value="2">
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl text-sm text-blue-700 flex items-start gap-2">
+                        <span class="text-lg">⏱️</span>
+                        <p>為支援先進先出(FIFO)，系統將在您按下確認時，自動記錄當下時間為「進貨時間戳記」。</p>
+                    </div>
+
+                    <button type="submit" class="w-full bg-theme py-4 rounded-xl font-bold text-lg shadow-md transition-all">
+                        確認蔬菜入庫 ✅
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- 3. 出貨作業畫面 (先進先出) -->
+        <section id="outbound" class="tab-content">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-800">📤 智能出貨作業 (FIFO)</h2>
+                <p class="text-gray-500 mt-2">系統會自動幫您找出放最久的蔬菜，避免放到壞掉喔！🥕</p>
+            </header>
+
+            <div style="background-color: var(--card-bg);" class="rounded-2xl shadow-sm border border-gray-100 p-8 max-w-2xl">
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-bold mb-2 text-lg">請問今天要出貨什麼蔬菜？</label>
+                    <select id="out-item" class="w-full p-4 border-2 border-gray-200 rounded-xl text-lg font-bold text-gray-700 focus:border-[var(--primary-color)] outline-none transition-all" onchange="findOldestStock()">
+                        <option value="">-- 請選擇蔬菜 --</option>
+                        <option value="甘藍菜">甘藍菜</option>
+                        <option value="青江菜">青江菜</option>
+                        <option value="高麗菜">高麗菜</option>
+                        <option value="番茄">番茄</option>
+                    </select>
+                </div>
+                
+                <!-- 先進先出提示區塊 (預設隱藏) -->
+                <div id="fifo-suggestion" class="hidden mt-8 border-4 rounded-2xl p-6 transition-all" style="border-color: var(--warning-color); background-color: #fffbeb;">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="text-4xl">💡</span>
+                        <h4 class="font-bold text-2xl" style="color: var(--warning-color);">系統建議取貨點</h4>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl p-4 shadow-sm mb-6 border border-yellow-200">
+                        <p class="text-gray-600 mb-2">請前往此處取貨 (最早入庫)：</p>
+                        <div class="flex items-center gap-4">
+                            <span id="fifo-wh" class="text-xl font-bold text-gray-800 bg-gray-100 px-4 py-2 rounded-lg"></span>
+                            <span class="text-gray-400">▶</span>
+                            <span id="fifo-bin" class="text-3xl font-extrabold px-6 py-2 rounded-lg text-theme border-2 border-theme bg-[var(--primary-light)]"></span>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-4 border-t pt-3">
+                            入庫時間：<span id="fifo-date" class="font-mono"></span> <br>
+                            (目前該儲位尚有 <span id="fifo-qty" class="font-bold text-lg text-black"></span> 箱)
+                        </p>
+                    </div>
+                    
+                    <div class="flex items-end gap-4 mt-4">
+                        <div class="w-1/3">
+                            <label class="block text-gray-700 font-bold mb-2">出貨數量：</label>
+                            <input type="number" id="out-qty" min="1" value="1" class="w-full p-4 border-2 border-gray-300 rounded-xl text-center text-xl font-bold">
+                        </div>
+                        <button onclick="confirmOutbound()" class="w-2/3 py-4 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105 text-white" style="background-color: var(--danger-color);">
+                            🚨 已搬出！點此扣除庫存
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="no-stock-msg" class="hidden mt-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl text-red-700 font-bold">
+                    ⚠️ 糟糕！目前所有倉庫都沒有此商品的庫存了！
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 盤點作業畫面 -->
+        <section id="inventory" class="tab-content">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-800">📋 日常盤點與報廢</h2>
+                <p class="text-gray-500 mt-2">發現腐爛蔬菜？請在此直接修正實際庫存並填寫備註。🗑️</p>
+            </header>
+
+            <div style="background-color: var(--card-bg);" class="rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-6 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                    <label class="font-bold text-gray-700 text-lg">切換盤點倉庫：</label>
+                    <select id="inv-wh-select" class="p-2 border border-gray-300 rounded-lg font-bold bg-white w-48" onchange="renderInventory()">
+                        <option value="1">🏢 倉庫 1</option>
+                        <option value="2">🏢 倉庫 2</option>
+                    </select>
+                </div>
+                
+                <div class="overflow-x-auto p-4">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr>
+                                <th>儲位</th>
+                                <th>蔬果種類</th>
+                                <th>帳面數量</th>
+                                <th>實際盤點數量</th>
+                                <th class="w-1/3">異常備註 (如: 腐爛報廢)</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inv-table">
+                            <!-- JS 動態產生 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- 模擬資料庫 (假資料) ---
+        // 刻意安排青江菜有兩筆，用來測試先進先出功能
+        let stockData = [
+            { id: 1, name: '甘藍菜', warehouse: '1', bin: 'A-10', qty: 5, date: '2026-09-25 08:00' },
+            { id: 2, name: '青江菜', warehouse: '1', bin: 'B-02', qty: 3, date: '2026-09-20 14:00' }, // 較舊的青江菜
+            { id: 3, name: '青江菜', warehouse: '2', bin: 'C-05', qty: 10, date: '2026-09-27 09:30' },// 較新的青江菜
+            { id: 4, name: '高麗菜', warehouse: '2', bin: 'D-01', qty: 8, date: '2026-09-26 11:00' }
+        ];
+
+        let currentOldestStockId = null;
+
+        // --- UI 切換邏輯 ---
+        function switchTab(tabId) {
+            // 隱藏所有內容
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            // 顯示選中內容
+            document.getElementById(tabId).classList.add('active');
+            
+            // 更新導覽列樣式 (取消所有高亮，設定目前高亮)
+            document.querySelectorAll('aside nav button').forEach(btn => {
+                btn.classList.remove('bg-white/10', 'text-white');
+                btn.classList.add('text-gray-300');
+            });
+            const activeBtn = document.getElementById(`nav-${tabId}`);
+            activeBtn.classList.remove('text-gray-300');
+            activeBtn.classList.add('bg-white/10', 'text-white');
+            
+            // 根據切換的頁面重新渲染資料
+            if (tabId === 'dashboard') renderDashboard();
+            if (tabId === 'inventory') renderInventory();
+            if (tabId === 'outbound') {
+                document.getElementById('out-item').value = "";
+                document.getElementById('fifo-suggestion').classList.add('hidden');
+                document.getElementById('no-stock-msg').classList.add('hidden');
+            }
+        }
+
+        // --- 1. 庫存總覽邏輯 ---
+        function renderDashboard() {
+            const wh1Tbody = document.getElementById('wh1-table');
+            const wh2Tbody = document.getElementById('wh2-table');
+            wh1Tbody.innerHTML = ''; wh2Tbody.innerHTML = '';
+
+            stockData.forEach(item => {
+                const icon = item.name === '青江菜' ? '🥬' : (item.name === '甘藍菜' || item.name === '高麗菜' ? '🥦' : '🍅');
+                const row = `<tr class="transition-colors">
+                    <td class="font-bold text-gray-700"><span class="bg-gray-100 border border-gray-200 px-3 py-1 rounded-lg">${item.bin}</span></td>
+                    <td class="font-bold text-gray-800">${icon} ${item.name}</td>
+                    <td class="text-blue-600 font-extrabold text-lg">${item.qty}</td>
+                    <td class="text-sm text-gray-500 font-mono">${item.date}</td>
+                </tr>`;
+                
+                if (item.warehouse === '1') wh1Tbody.innerHTML += row;
+                else wh2Tbody.innerHTML += row;
+            });
+        }
+
+        // --- 2. 進貨邏輯 ---
+        function handleInbound(e) {
+            e.preventDefault();
+            const name = document.getElementById('in-item').value;
+            const warehouse = document.getElementById('in-wh').value;
+            const bin = document.getElementById('in-bin').value.toUpperCase();
+            const qty = parseInt(document.getElementById('in-qty').value);
+            
+            // 取得現在時間 (格式化 YYYY-MM-DD HH:MM)
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+            stockData.push({
+                id: Date.now(), // 用時間戳當唯一ID
+                name: name,
+                warehouse: warehouse,
+                bin: bin,
+                qty: qty,
+                date: dateStr
+            });
+
+            // 使用客製化訊息彈窗代替一般alert會更好，但為求簡單先用原生
+            alert(`✅ 進貨登記成功！\n\n品項：${name}\n數量：${qty} 箱\n位置：倉庫 ${warehouse} (儲位 ${bin})\n系統紀錄時間：${dateStr}`);
+            document.getElementById('inbound-form').reset();
+            switchTab('dashboard');
+        }
+
+        // --- 3. 出貨邏輯 (先進先出 FIFO) ---
+        function findOldestStock() {
+            const itemName = document.getElementById('out-item').value;
+            const fifoBox = document.getElementById('fifo-suggestion');
+            const noStockBox = document.getElementById('no-stock-msg');
+            
+            if (!itemName) {
+                fifoBox.classList.add('hidden');
+                noStockBox.classList.add('hidden');
+                return;
+            }
+
+            // 1. 找出該品項所有大於 0 的庫存
+            let items = stockData.filter(s => s.name === itemName && s.qty > 0);
+            
+            if (items.length === 0) {
+                fifoBox.classList.add('hidden');
+                noStockBox.classList.remove('hidden');
+                return;
+            }
+
+            // 2. 依照時間排序找最早的 (模擬 FIFO 核心演算法)
+            items.sort((a, b) => new Date(a.date) - new Date(b.date));
+            const oldest = items[0];
+            currentOldestStockId = oldest.id;
+
+            // 3. 渲染到提示區塊
+            document.getElementById('fifo-wh').innerText = `倉庫 ${oldest.warehouse}`;
+            document.getElementById('fifo-bin').innerText = oldest.bin;
+            document.getElementById('fifo-date').innerText = oldest.date;
+            document.getElementById('fifo-qty').innerText = oldest.qty;
+            document.getElementById('out-qty').max = oldest.qty;
+            document.getElementById('out-qty').value = 1;
+
+            noStockBox.classList.add('hidden');
+            fifoBox.classList.remove('hidden');
+        }
+
+        function confirmOutbound() {
+            const outQty = parseInt(document.getElementById('out-qty').value);
+            const stockIndex = stockData.findIndex(s => s.id === currentOldestStockId);
+            
+            if (stockIndex !== -1) {
+                const stock = stockData[stockIndex];
+                if (outQty > stock.qty) {
+                    alert('❌ 錯誤：出貨數量大於該儲位現有庫存！');
+                    return;
+                }
+                if (outQty <= 0) {
+                    alert('❌ 錯誤：數量必須大於 0！');
+                    return;
+                }
+                
+                // 扣除庫存
+                stock.qty -= outQty;
+                // 如果扣完變成0，從陣列移除該筆資料
+                if (stock.qty === 0) {
+                    stockData.splice(stockIndex, 1);
+                }
+                
+                alert(`✅ 出貨成功！防呆機制已啟動。\n已從 ${stock.bin} 儲位扣除 ${outQty} 箱。`);
+                switchTab('dashboard');
+            }
+        }
+
+        // --- 4. 盤點邏輯 ---
+        function renderInventory() {
+            const wh = document.getElementById('inv-wh-select').value;
+            const tbody = document.getElementById('inv-table');
+            tbody.innerHTML = '';
+
+            const items = stockData.filter(s => s.warehouse === wh);
+            
+            if (items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-500 font-bold bg-gray-50">此倉庫目前清空無庫存</td></tr>`;
+                return;
+            }
+
+            items.forEach(item => {
+                tbody.innerHTML += `
+                <tr class="transition-colors hover:bg-red-50">
+                    <td class="font-bold"><span class="bg-gray-200 px-2 py-1 rounded text-gray-700">${item.bin}</span></td>
+                    <td class="font-bold">${item.name}</td>
+                    <td class="text-gray-500 font-bold">${item.qty} 箱</td>
+                    <td>
+                        <input type="number" id="actual-${item.id}" value="${item.qty}" min="0" class="w-24 p-2 border-2 border-gray-300 rounded-lg focus:border-red-400 outline-none font-bold text-center">
+                    </td>
+                    <td>
+                        <input type="text" id="note-${item.id}" placeholder="例如：發現蔬菜腐爛" class="w-full p-2 border border-gray-300 rounded-lg focus:border-red-400 outline-none text-sm">
+                    </td>
+                    <td>
+                        <button onclick="updateInventory(${item.id})" class="bg-gray-800 hover:bg-gray-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors shadow-sm">
+                            💾 更新庫存
+                        </button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        function updateInventory(id) {
+            const actualQtyInput = document.getElementById(`actual-${id}`);
+            const actualQty = parseInt(actualQtyInput.value);
+            const note = document.getElementById(`note-${id}`).value;
+            
+            if (actualQty < 0) {
+                alert("數量不能小於 0");
+                return;
+            }
+
+            const index = stockData.findIndex(s => s.id === id);
+            if (index !== -1) {
+                const oldQty = stockData[index].qty;
+                
+                if (oldQty === actualQty && note.trim() === '') {
+                    alert("數量無變更，且無備註。");
+                    return;
+                }
+
+                stockData[index].qty = actualQty;
+                
+                let msg = `✅ 盤點與修正完成！\n`;
+                msg += `原本數量：${oldQty}箱 ➡️ 修正後數量：${actualQty}箱`;
+                if (note) msg += `\n備註事由：${note}`;
+                
+                alert(msg);
+                
+                if (actualQty === 0) {
+                    stockData.splice(index, 1);
+                }
+                renderInventory(); // 重新整理盤點畫面
+            }
+        }
+
+        // 初始載入渲染
+        renderDashboard();
+    </script>
+</body>
+</html>
