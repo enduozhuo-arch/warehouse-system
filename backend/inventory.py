@@ -9,13 +9,13 @@ def update_spoilage(batch, spoiled_quantity):
     if spoiled_quantity < 0:
         raise ValueError("腐爛數量不能小於 0")
 
-    if spoiled_quantity > batch["quantity"]:
+    if spoiled_quantity > batch["qty"]:
         raise ValueError("腐爛數量不能大於目前庫存")
 
-    batch["quantity"] -= spoiled_quantity
+    batch["qty"] -= spoiled_quantity
 
     return {
-        "batch_id": batch["batch_id"],
+        "id": batch["id"],
         "spoiled_quantity": spoiled_quantity,
-        "remaining_quantity": batch["quantity"]
+        "qty": batch["qty"]
     }

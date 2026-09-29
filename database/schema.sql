@@ -69,3 +69,14 @@ VALUES
 (3, 2, 3, 40, '2026-09-22 09:00:00'),
 (4, 1, 4, 60, '2026-09-23 11:00:00'),
 (5, 3, 5, 35, '2026-09-26 14:00:00');
+CREATE TABLE inventory_transactions (
+    transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_id INTEGER NOT NULL,
+    transaction_type VARCHAR(20) NOT NULL,
+    quantity_change INTEGER NOT NULL,
+    operator VARCHAR(60) NOT NULL,
+    reason VARCHAR(100),
+    note VARCHAR(160),
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (batch_id) REFERENCES inventory_batches(batch_id)
+);
