@@ -2,8 +2,15 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from backend.database import get_connection
+
+
+def to_iso(received_at):
+    # 資料庫存 '2026-09-20 08:00:00'，前端使用 ISO 8601（含台灣時區）
+    return received_at.replace(" ", "T") + "+08:00"
+
+
 class OutboundRequest(BaseModel):
-    warehouse_id: int
+    warehouse: int
     product_id: int
     quantity: int
 
@@ -14,7 +21,7 @@ app = FastAPI(
 )
 
 class SpoilageRequest(BaseModel):
-    batch_id: int
+    id: int
     spoiled_quantity: int
 
 @app.get("/")
@@ -31,14 +38,14 @@ def get_inventory():
     try:
         rows = connection.execute("""
             SELECT
-                ib.batch_id,
-                w.warehouse_id,
+                ib.batch_id AS id,
+                CAST(w.warehouse_id AS TEXT) AS warehouse,
                 w.warehouse_name,
                 p.product_id,
-                p.product_name,
-                l.location_code,
-                ib.quantity,
-                ib.received_at
+                p.product_name AS name,
+                l.location_code AS bin,
+                ib.quantity AS qty,
+                ib.received_at AS receivedAt
             FROM inventory_batches ib
             JOIN products p
                 ON ib.product_id = p.product_id
@@ -49,13 +56,16 @@ def get_inventory():
             ORDER BY w.warehouse_id, ib.received_at
         """).fetchall()
 
-        return [dict(row) for row in rows]
+        return [
+            {**dict(row), "receivedAt": to_iso(row["receivedAt"])}
+            for row in rows
+        ]
 
     finally:
         connection.close()
 @app.get("/api/inventory/fifo")
 def get_fifo_suggestion(
-    warehouse_id: int,
+    warehouse: int,
     product_id: int,
     quantity: int
 ):
@@ -75,7 +85,7 @@ def get_fifo_suggestion(
               AND ib.product_id = ?
               AND ib.quantity > 0
             ORDER BY ib.received_at ASC
-        """, (warehouse_id, product_id)).fetchall()
+        """, (warehouse, product_id)).fetchall()
 
         remaining = quantity
         outbound = []
@@ -87,10 +97,10 @@ def get_fifo_suggestion(
             take_quantity = min(row["quantity"], remaining)
 
             outbound.append({
-                "batch_id": row["batch_id"],
-                "location": row["location_code"],
+                "id": row["batch_id"],
+                "bin": row["location_code"],
                 "quantity": take_quantity,
-                "received_at": row["received_at"]
+                "receivedAt": to_iso(row["received_at"])
             })
 
             remaining -= take_quantity
@@ -134,7 +144,7 @@ def outbound(request: OutboundRequest):
               AND ib.quantity > 0
             ORDER BY ib.received_at ASC
         """, (
-            request.warehouse_id,
+            request.warehouse,
             request.product_id
         )).fetchall()
 
@@ -163,8 +173,8 @@ def outbound(request: OutboundRequest):
             """, (new_quantity, row["batch_id"]))
 
             outbound_records.append({
-                "batch_id": row["batch_id"],
-                "location": row["location_code"],
+                "id": row["batch_id"],
+                "bin": row["location_code"],
                 "quantity": take_quantity
             })
 
@@ -214,7 +224,7 @@ def update_spoilage_api(request: SpoilageRequest):
             JOIN products p
                 ON ib.product_id = p.product_id
             WHERE ib.batch_id = ?
-        """, (request.batch_id,)).fetchone()
+        """, (request.id,)).fetchone()
 
         if batch is None:
             raise HTTPException(
@@ -236,19 +246,19 @@ def update_spoilage_api(request: SpoilageRequest):
             UPDATE inventory_batches
             SET quantity = ?
             WHERE batch_id = ?
-        """, (new_quantity, request.batch_id))
+        """, (new_quantity, request.id))
 
         connection.commit()
 
         return {
             "success": True,
             "message": "盤點更新完成",
-            "batch_id": batch["batch_id"],
-            "warehouse_id": batch["warehouse_id"],
-            "product_name": batch["product_name"],
-            "location": batch["location_code"],
+            "id": batch["batch_id"],
+            "warehouse": str(batch["warehouse_id"]),
+            "name": batch["product_name"],
+            "bin": batch["location_code"],
             "spoiled_quantity": request.spoiled_quantity,
-            "remaining_quantity": new_quantity
+            "qty": new_quantity
         }
 
     except HTTPException:

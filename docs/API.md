@@ -10,29 +10,45 @@
 
 Request：
 
-- warehouse_id：倉庫編號
+- warehouse：倉庫編號
 - product_id：商品編號
 - quantity：預計出貨數量
 
 Example：
 
-GET /api/inventory/fifo?warehouse_id=1&product_id=1&quantity=60
+GET /api/inventory/fifo?warehouse=1&product_id=1&quantity=60
 
 Response：
 
 ```json
 {
+  "success": true,
   "requested_quantity": 60,
   "outbound": [
     {
-      "batch_id": 1,
-      "location": "A01",
-      "quantity": 50
+      "id": 1,
+      "bin": "A01",
+      "quantity": 50,
+      "receivedAt": "2026-09-20T08:00:00+08:00"
     },
     {
-      "batch_id": 2,
-      "location": "A02",
-      "quantity": 10
+      "id": 2,
+      "bin": "A02",
+      "quantity": 10,
+      "receivedAt": "2026-09-25T10:00:00+08:00"
     }
   ]
 }
+```
+
+## 欄位命名（與前端 fronted/app.js 一致）
+
+| 欄位 | 說明 |
+| --- | --- |
+| id | 庫存批次編號 |
+| name | 商品名稱 |
+| warehouse | 倉庫編號（回應中為字串，例如 "1"） |
+| bin | 儲位代碼 |
+| qty | 批次目前庫存數量 |
+| quantity | 本次出貨／請求數量 |
+| receivedAt | 入庫時間，ISO 8601 格式（+08:00） |

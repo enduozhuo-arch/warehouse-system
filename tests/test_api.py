@@ -31,14 +31,24 @@ class TestAPI(unittest.TestCase):
         response = client.get("/api/inventory")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.json(), list)
+
+        data = response.json()
+
+        self.assertIsInstance(data, list)
+
+        # 欄位名稱與格式需和前端 fronted/app.js 的 batch 物件一致
+        first = data[0]
+        for key in ("id", "name", "warehouse", "bin", "qty", "receivedAt"):
+            self.assertIn(key, first)
+        self.assertIsInstance(first["warehouse"], str)
+        self.assertEqual(first["receivedAt"], "2026-09-20T08:00:00+08:00")
 
     def test_02_fifo_suggestion(self):
         # 倉庫 2 的高麗菜目前有 60，避免使用已出貨的倉庫 1
         response = client.get(
             "/api/inventory/fifo",
             params={
-                "warehouse_id": 2,
+                "warehouse": 2,
                 "product_id": 1,
                 "quantity": 20
             }
@@ -50,14 +60,19 @@ class TestAPI(unittest.TestCase):
 
         self.assertTrue(data["success"])
         self.assertEqual(data["requested_quantity"], 20)
-        self.assertEqual(data["outbound"][0]["location"], "B01")
+        self.assertEqual(data["outbound"][0]["bin"], "B01")
         self.assertEqual(data["outbound"][0]["quantity"], 20)
+        self.assertEqual(data["outbound"][0]["id"], 4)
+        self.assertEqual(
+            data["outbound"][0]["receivedAt"],
+            "2026-09-23T11:00:00+08:00"
+        )
 
     def test_03_outbound(self):
         response = client.post(
             "/api/outbound",
             json={
-                "warehouse_id": 2,
+                "warehouse": 2,
                 "product_id": 1,
                 "quantity": 10
             }
@@ -68,7 +83,7 @@ class TestAPI(unittest.TestCase):
         data = response.json()
 
         self.assertTrue(data["success"])
-        self.assertEqual(data["outbound"][0]["location"], "B01")
+        self.assertEqual(data["outbound"][0]["bin"], "B01")
         self.assertEqual(data["outbound"][0]["quantity"], 10)
 
     def test_04_spoilage(self):
@@ -76,7 +91,7 @@ class TestAPI(unittest.TestCase):
         response = client.patch(
             "/api/inventory/spoilage",
             json={
-                "batch_id": 5,
+                "id": 5,
                 "spoiled_quantity": 5
             }
         )
@@ -87,7 +102,11 @@ class TestAPI(unittest.TestCase):
 
         self.assertTrue(data["success"])
         self.assertEqual(data["spoiled_quantity"], 5)
-        self.assertEqual(data["remaining_quantity"], 30)
+        self.assertEqual(data["qty"], 30)
+        self.assertEqual(data["id"], 5)
+        self.assertEqual(data["warehouse"], "2")
+        self.assertEqual(data["name"], "白蘿蔔")
+        self.assertEqual(data["bin"], "B02")
 
 
 if __name__ == "__main__":
