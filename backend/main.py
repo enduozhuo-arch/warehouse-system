@@ -1,34 +1,106 @@
+from datetime import datetime, timezone, timedelta
+from multiprocessing.dummy import connection
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from backend.database import get_connection
 
 
+TAIPEI_TZ = timezone(timedelta(hours=8))
+
+app = FastAPI(
+    title="竹南冷凍倉儲系統 API",
+    description="提供進貨、庫存、FIFO 出貨與盤點功能",
+    version="1.1.0",
+)
+
+
 def to_iso(received_at):
-    # 資料庫存 '2026-09-20 08:00:00'，前端使用 ISO 8601（含台灣時區）
-    return received_at.replace(" ", "T") + "+08:00"
+    if not received_at:
+        return received_at
+
+    # SQLite 原始格式：2026-09-20 08:00:00
+    if "T" not in received_at:
+        received_at = received_at.replace(" ", "T")
+
+    if not received_at.endswith("+08:00"):
+        received_at += "+08:00"
+
+    return received_at
+
+
+def batch_to_frontend(row):
+    return {
+        "id": row["batch_id"],
+        "name": row["product_name"],
+        "warehouse": str(row["warehouse_id"]),
+        "bin": row["location_code"],
+        "qty": row["quantity"],
+        "receivedAt": to_iso(row["received_at"]),
+    }
+
+def record_transaction(
+    connection,
+    batch_id,
+    transaction_type,
+    quantity_change,
+    operator,
+    reason="",
+    note="",
+):
+    created_at = datetime.now(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+    connection.execute(
+        """
+        INSERT INTO inventory_transactions
+            (
+                batch_id,
+                transaction_type,
+                quantity_change,
+                operator,
+                reason,
+                note,
+                created_at
+            )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            batch_id,
+            transaction_type,
+            quantity_change,
+            operator,
+            reason,
+            note,
+            created_at,
+        ),
+    )
+
+class InboundRequest(BaseModel):
+    item: str
+    warehouse: str
+    bin: str
+    quantity: int
+    operator: str
 
 
 class OutboundRequest(BaseModel):
-    warehouse: int
-    product_id: int
+    item: str
     quantity: int
+    operator: str
 
-app = FastAPI(
-    title="竹南倉儲管理系統 API",
-    description="提供庫存、FIFO 出貨與盤點功能",
-    version="1.0.0"
-)
 
-class SpoilageRequest(BaseModel):
+class InventoryAdjustmentRequest(BaseModel):
     id: int
-    spoiled_quantity: int
+    actual_quantity: int
+    reason: str = ""
+    note: str = ""
+    operator: str
+
 
 @app.get("/")
 def home():
-    return {
-        "message": "Warehouse System API is running"
-    }
+    return {"message": "Warehouse System API is running"}
 
 
 @app.get("/api/inventory")
@@ -36,56 +108,157 @@ def get_inventory():
     connection = get_connection()
 
     try:
-        rows = connection.execute("""
+        rows = connection.execute(
+            """
             SELECT
-                ib.batch_id AS id,
-                CAST(w.warehouse_id AS TEXT) AS warehouse,
-                w.warehouse_name,
-                p.product_id,
-                p.product_name AS name,
-                l.location_code AS bin,
-                ib.quantity AS qty,
-                ib.received_at AS receivedAt
+                ib.batch_id,
+                p.product_name,
+                l.warehouse_id,
+                l.location_code,
+                ib.quantity,
+                ib.received_at
             FROM inventory_batches ib
             JOIN products p
                 ON ib.product_id = p.product_id
             JOIN locations l
                 ON ib.location_id = l.location_id
-            JOIN warehouses w
-                ON l.warehouse_id = w.warehouse_id
-            ORDER BY w.warehouse_id, ib.received_at
-        """).fetchall()
+            ORDER BY l.warehouse_id, ib.received_at
+            """
+        ).fetchall()
 
-        return [
-            {**dict(row), "receivedAt": to_iso(row["receivedAt"])}
-            for row in rows
-        ]
+        return [batch_to_frontend(row) for row in rows]
 
     finally:
         connection.close()
-@app.get("/api/inventory/fifo")
-def get_fifo_suggestion(
-    warehouse: int,
-    product_id: int,
-    quantity: int
-):
+
+
+@app.post("/api/inbound")
+def inbound(request: InboundRequest):
+    if request.quantity <= 0:
+        raise HTTPException(status_code=400, detail="進貨數量必須大於 0")
+
+    if not request.item.strip():
+        raise HTTPException(status_code=400, detail="商品名稱不可為空")
+
+    if not request.bin.strip():
+        raise HTTPException(status_code=400, detail="儲位不可為空")
+
+    if not request.operator.strip():
+        raise HTTPException(status_code=400, detail="請填寫操作人")
+
     connection = get_connection()
 
     try:
-        rows = connection.execute("""
+        product = connection.execute(
+            """
+            SELECT product_id
+            FROM products
+            WHERE product_name = ?
+            """,
+            (request.item.strip(),),
+        ).fetchone()
+
+        if product is None:
+            raise HTTPException(status_code=404, detail="找不到此商品")
+
+        location = connection.execute(
+            """
+            SELECT location_id
+            FROM locations
+            WHERE warehouse_id = ?
+              AND location_code = ?
+            """,
+            (int(request.warehouse), request.bin.strip().upper()),
+        ).fetchone()
+
+        if location is None:
+            raise HTTPException(status_code=404, detail="找不到此倉庫儲位")
+
+        next_id = connection.execute(
+            """
+            SELECT COALESCE(MAX(batch_id), 0) + 1 AS next_id
+            FROM inventory_batches
+            """
+        ).fetchone()["next_id"]
+
+        received_at = datetime.now(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+        connection.execute(
+            """
+            INSERT INTO inventory_batches
+                (batch_id, product_id, location_id, quantity, received_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                next_id,
+                product["product_id"],
+                location["location_id"],
+                request.quantity,
+                received_at,
+            ),
+        )
+        record_transaction(
+    connection=connection,
+    batch_id=next_id,
+    transaction_type="進貨",
+    quantity_change=request.quantity,
+    operator=request.operator.strip(),
+)
+
+        connection.commit()
+
+        return {
+            "success": True,
+            "message": "進貨完成",
+            "batch": {
+                "id": next_id,
+                "name": request.item.strip(),
+                "warehouse": str(request.warehouse),
+                "bin": request.bin.strip().upper(),
+                "qty": request.quantity,
+                "receivedAt": to_iso(received_at),
+            },
+            "operator": request.operator.strip(),
+        }
+
+    except HTTPException:
+        connection.rollback()
+        raise
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+@app.get("/api/inventory/fifo")
+def get_fifo_suggestion(item: str, quantity: int):
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="出貨數量必須大於 0")
+
+    connection = get_connection()
+
+    try:
+        rows = connection.execute(
+            """
             SELECT
                 ib.batch_id,
+                p.product_name,
+                l.warehouse_id,
                 l.location_code,
                 ib.quantity,
                 ib.received_at
             FROM inventory_batches ib
+            JOIN products p
+                ON ib.product_id = p.product_id
             JOIN locations l
                 ON ib.location_id = l.location_id
-            WHERE l.warehouse_id = ?
-              AND ib.product_id = ?
+            WHERE p.product_name = ?
               AND ib.quantity > 0
-            ORDER BY ib.received_at ASC
-        """, (warehouse, product_id)).fetchall()
+            ORDER BY ib.received_at ASC, ib.batch_id ASC
+            """,
+            (item,),
+        ).fetchall()
 
         remaining = quantity
         outbound = []
@@ -94,66 +267,76 @@ def get_fifo_suggestion(
             if remaining <= 0:
                 break
 
-            take_quantity = min(row["quantity"], remaining)
+            take = min(row["quantity"], remaining)
 
-            outbound.append({
-                "id": row["batch_id"],
-                "bin": row["location_code"],
-                "quantity": take_quantity,
-                "receivedAt": to_iso(row["received_at"])
-            })
+            outbound.append(
+                {
+                    "id": row["batch_id"],
+                    "name": row["product_name"],
+                    "warehouse": str(row["warehouse_id"]),
+                    "bin": row["location_code"],
+                    "quantity": take,
+                    "receivedAt": to_iso(row["received_at"]),
+                }
+            )
 
-            remaining -= take_quantity
+            remaining -= take
 
         if remaining > 0:
             return {
                 "success": False,
-                "message": "庫存不足，無法完成出貨"
+                "message": "庫存不足，無法完成出貨",
+                "outbound": outbound,
             }
 
         return {
             "success": True,
             "requested_quantity": quantity,
-            "outbound": outbound
+            "outbound": outbound,
         }
 
     finally:
         connection.close()
+
+
 @app.post("/api/outbound")
 def outbound(request: OutboundRequest):
     if request.quantity <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="出貨數量必須大於 0"
-        )
+        raise HTTPException(status_code=400, detail="出貨數量必須大於 0")
+
+    if not request.operator.strip():
+        raise HTTPException(status_code=400, detail="請填寫操作人")
 
     connection = get_connection()
 
     try:
-        rows = connection.execute("""
+        rows = connection.execute(
+            """
             SELECT
                 ib.batch_id,
+                p.product_name,
+                l.warehouse_id,
                 l.location_code,
                 ib.quantity,
                 ib.received_at
             FROM inventory_batches ib
+            JOIN products p
+                ON ib.product_id = p.product_id
             JOIN locations l
                 ON ib.location_id = l.location_id
-            WHERE l.warehouse_id = ?
-              AND ib.product_id = ?
+            WHERE p.product_name = ?
               AND ib.quantity > 0
-            ORDER BY ib.received_at ASC
-        """, (
-            request.warehouse,
-            request.product_id
-        )).fetchall()
+            ORDER BY ib.received_at ASC, ib.batch_id ASC
+            """,
+            (request.item,),
+        ).fetchall()
 
         total_stock = sum(row["quantity"] for row in rows)
 
         if total_stock < request.quantity:
             raise HTTPException(
                 status_code=400,
-                detail="庫存不足，無法完成出貨"
+                detail="庫存不足，無法完成出貨",
             )
 
         remaining = request.quantity
@@ -163,29 +346,143 @@ def outbound(request: OutboundRequest):
             if remaining <= 0:
                 break
 
-            take_quantity = min(row["quantity"], remaining)
-            new_quantity = row["quantity"] - take_quantity
+            take = min(row["quantity"], remaining)
+            new_quantity = row["quantity"] - take
 
-            connection.execute("""
+            connection.execute(
+                """
                 UPDATE inventory_batches
                 SET quantity = ?
                 WHERE batch_id = ?
-            """, (new_quantity, row["batch_id"]))
+                """,
+                (new_quantity, row["batch_id"]),
+            )
+            record_transaction(
+             connection=connection,
+            batch_id=row["batch_id"],
+            transaction_type="出貨",
+             quantity_change=-take,
+            operator=request.operator.strip(),
+)
+            outbound_records.append(
+                {
+                    "id": row["batch_id"],
+                    "name": row["product_name"],
+                    "warehouse": str(row["warehouse_id"]),
+                    "bin": row["location_code"],
+                    "quantity": take,
+                    "receivedAt": to_iso(row["received_at"]),
+                }
+            )
 
-            outbound_records.append({
-                "id": row["batch_id"],
-                "bin": row["location_code"],
-                "quantity": take_quantity
-            })
-
-            remaining -= take_quantity
+            remaining -= take
 
         connection.commit()
 
         return {
             "success": True,
             "message": "出貨完成",
-            "outbound": outbound_records
+            "operator": request.operator.strip(),
+            "outbound": outbound_records,
+        }
+
+    except HTTPException:
+        connection.rollback()
+        raise
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+@app.patch("/api/inventory")
+def update_inventory(request: InventoryAdjustmentRequest):
+    if request.actual_quantity < 0:
+        raise HTTPException(status_code=400, detail="實際數量不可小於 0")
+
+    if not request.operator.strip():
+        raise HTTPException(status_code=400, detail="請填寫操作人")
+
+    connection = get_connection()
+
+    try:
+        batch = connection.execute(
+            """
+            SELECT
+                ib.batch_id,
+                ib.quantity,
+                ib.received_at,
+                p.product_name,
+                l.warehouse_id,
+                l.location_code
+            FROM inventory_batches ib
+            JOIN products p
+                ON ib.product_id = p.product_id
+            JOIN locations l
+                ON ib.location_id = l.location_id
+            WHERE ib.batch_id = ?
+            """,
+            (request.id,),
+        ).fetchone()
+
+        if batch is None:
+            raise HTTPException(
+                status_code=404,
+                detail="找不到此庫存批次"
+            )
+
+        old_quantity = batch["quantity"]
+        difference = request.actual_quantity - old_quantity
+
+        if difference != 0 and not request.reason.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="庫存數量有差異時必須填寫原因",
+            )
+
+        connection.execute(
+            """
+            UPDATE inventory_batches
+            SET quantity = ?
+            WHERE batch_id = ?
+            """,
+            (request.actual_quantity, request.id),
+        )
+
+        if difference != 0:
+            transaction_type = (
+                "報廢"
+                if request.reason.strip() in ["rotten", "damaged"]
+                else "盤點調整"
+            )
+
+            record_transaction(
+                connection=connection,
+                batch_id=request.id,
+                transaction_type=transaction_type,
+                quantity_change=difference,
+                operator=request.operator.strip(),
+                reason=request.reason.strip(),
+                note=request.note.strip(),
+            )
+
+        connection.commit()
+
+        return {
+            "success": True,
+            "message": "盤點更新完成",
+            "id": batch["batch_id"],
+            "name": batch["product_name"],
+            "warehouse": str(batch["warehouse_id"]),
+            "bin": batch["location_code"],
+            "oldQty": old_quantity,
+            "qty": request.actual_quantity,
+            "difference": difference,
+            "reason": request.reason,
+            "note": request.note,
+            "operator": request.operator.strip(),
+            "receivedAt": to_iso(batch["received_at"]),
         }
 
     except HTTPException:
@@ -198,76 +495,50 @@ def outbound(request: OutboundRequest):
 
     finally:
         connection.close()
-@app.patch("/api/inventory/spoilage")
-def update_spoilage_api(request: SpoilageRequest):
-    if request.spoiled_quantity <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="腐爛數量必須大於 0"
-        )
-
+@app.get("/api/transactions")
+def get_transactions():
     connection = get_connection()
 
     try:
-        batch = connection.execute("""
+        rows = connection.execute(
+            """
             SELECT
-                ib.batch_id,
-                ib.quantity,
-                l.location_code,
-                w.warehouse_id,
-                p.product_name
-            FROM inventory_batches ib
-            JOIN locations l
-                ON ib.location_id = l.location_id
-            JOIN warehouses w
-                ON l.warehouse_id = w.warehouse_id
+                t.transaction_id,
+                t.transaction_type,
+                t.quantity_change,
+                t.operator,
+                t.reason,
+                t.note,
+                t.created_at,
+                p.product_name,
+                l.warehouse_id,
+                l.location_code
+            FROM inventory_transactions t
+            JOIN inventory_batches ib
+                ON t.batch_id = ib.batch_id
             JOIN products p
                 ON ib.product_id = p.product_id
-            WHERE ib.batch_id = ?
-        """, (request.id,)).fetchone()
+            JOIN locations l
+                ON ib.location_id = l.location_id
+            ORDER BY t.created_at DESC, t.transaction_id DESC
+            """
+        ).fetchall()
 
-        if batch is None:
-            raise HTTPException(
-                status_code=404,
-                detail="找不到指定批次"
-            )
-
-        if request.spoiled_quantity > batch["quantity"]:
-            raise HTTPException(
-                status_code=400,
-                detail="腐爛數量不能大於目前庫存"
-            )
-
-        new_quantity = (
-            batch["quantity"] - request.spoiled_quantity
-        )
-
-        connection.execute("""
-            UPDATE inventory_batches
-            SET quantity = ?
-            WHERE batch_id = ?
-        """, (new_quantity, request.id))
-
-        connection.commit()
-
-        return {
-            "success": True,
-            "message": "盤點更新完成",
-            "id": batch["batch_id"],
-            "warehouse": str(batch["warehouse_id"]),
-            "name": batch["product_name"],
-            "bin": batch["location_code"],
-            "spoiled_quantity": request.spoiled_quantity,
-            "qty": new_quantity
-        }
-
-    except HTTPException:
-        connection.rollback()
-        raise
-
-    except Exception:
-        connection.rollback()
-        raise
+        return [
+            {
+                "id": row["transaction_id"],
+                "at": to_iso(row["created_at"]),
+                "kind": row["transaction_type"],
+                "name": row["product_name"],
+                "warehouse": str(row["warehouse_id"]),
+                "bin": row["location_code"],
+                "quantity": row["quantity_change"],
+                "operator": row["operator"],
+                "reason": row["reason"] or "",
+                "note": row["note"] or "",
+            }
+            for row in rows
+        ]
 
     finally:
         connection.close()
