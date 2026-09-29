@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="竹南冷凍倉儲系統">
+    <title>竹南冷凍倉儲系統</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="app.js" defer></script>
+</head>
+<body>
+
+    <div>
+        <!-- 側邊欄導覽 -->
+        <aside aria-label="系統側邊欄">
+            <div>
+                <h1>竹南冷凍倉儲</h1>
+                <p>倉庫作業管理</p>
+            </div>
+            
+            <nav aria-label="主要導覽">
+                <button type="button" class="nav-button" data-tab="dashboard" aria-current="page">庫存總覽</button>
+                <button type="button" class="nav-button" data-tab="inbound">進貨登記</button>
+                <button type="button" class="nav-button" data-tab="outbound">出貨作業（先進先出）</button>
+                <button type="button" class="nav-button" data-tab="inventory">盤點與報廢</button>
+            </nav>
+        </aside>
+
+        <!-- 主要內容區 -->
+        <main>
+            <!-- 1. 庫存總覽頁面 -->
+            <section id="dashboard" class="tab-content" aria-labelledby="dashboard-title">
+                <header>
+                    <div>
+                        <h2 id="dashboard-title">庫存總覽</h2>
+                        <p>查看兩個倉庫的商品、數量和入庫時間</p>
+                    </div>
+                    <p>資料最後更新：<time id="last-updated"></time></p>
+                </header>
+
+                <div>
+                    <!-- 倉庫 1 -->
+                    <section aria-labelledby="warehouse1-title">
+                        <div>
+                            <h3 id="warehouse1-title">倉庫 1</h3>
+                            <span id="warehouse1-summary"></span>
+                        </div>
+                        <div>
+                            <table>
+                                <caption class="sr-only">倉庫 1 庫存明細</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">儲位</th>
+                                        <th scope="col">商品</th>
+                                        <th scope="col">數量</th>
+                                        <th scope="col">入庫時間</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="wh1-table"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- 倉庫 2 -->
+                    <section aria-labelledby="warehouse2-title">
+                        <div>
+                            <h3 id="warehouse2-title">倉庫 2</h3>
+                            <span id="warehouse2-summary"></span>
+                        </div>
+                        <div>
+                            <table>
+                                <caption class="sr-only">倉庫 2 庫存明細</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">儲位</th>
+                                        <th scope="col">商品</th>
+                                        <th scope="col">數量</th>
+                                        <th scope="col">入庫時間</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="wh2-table"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- 近期庫存紀錄 -->
+                <section aria-labelledby="activity-title">
+                    <h3 id="activity-title">近期庫存紀錄</h3>
+                    <p>查看作業時間、商品數量與操作人</p>
+                    <div>
+                        <table>
+                            <caption class="sr-only">近期庫存紀錄</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">時間</th>
+                                    <th scope="col">作業</th>
+                                    <th scope="col">品項／位置</th>
+                                    <th scope="col">數量</th>
+                                    <th scope="col">原因／操作人</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activity-table"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </section>
+
+            <!-- 2. 進貨登記頁面 -->
+            <section id="inbound" class="tab-content hidden" aria-labelledby="inbound-title" hidden>
+                <header>
+                    <h2 id="inbound-title">進貨登記</h2>
+                    <p>填寫商品、倉庫、儲位和數量。系統會記錄進貨時間，供出貨排序使用。</p>
+                </header>
+
+                <section aria-label="進貨表單">
+                    <form id="inbound-form">
+                        <div>
+                            <div>
+                                <label for="in-item">商品名稱</label>
+                                <select id="in-item" name="item" required>
+                                    <option value="甘藍菜">甘藍菜</option>
+                                    <option value="青江菜">青江菜</option>
+                                    <option value="高麗菜">高麗菜</option>
+                                    <option value="番茄">番茄</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="in-wh">存放倉庫</label>
+                                <select id="in-wh" name="warehouse" required>
+                                    <option value="1">倉庫 1</option>
+                                    <option value="2">倉庫 2</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="in-bin">儲位</label>
+                                <input id="in-bin" name="bin" type="text" placeholder="例如：A-01" maxlength="20" required>
+                            </div>
+                            <div>
+                                <label for="in-qty">進貨數量（箱）</label>
+                                <input id="in-qty" name="quantity" type="number" min="1" step="1" value="2" required>
+                            </div>
+                            <div>
+                                <label for="in-operator">操作人</label>
+                                <input id="in-operator" name="operator" type="text" value="" placeholder="請輸入姓名" maxlength="60" required>
+                            </div>
+                        </div>
+                        <p>系統會在確認進貨時自動記錄時間，作為先進先出的排序依據。</p>
+                        <button type="submit">確認進貨</button>
+                    </form>
+                </section>
+            </section>
+
+            <!-- 3. 出貨作業頁面 -->
+            <section id="outbound" class="tab-content hidden" aria-labelledby="outbound-title" hidden>
+                <header>
+                    <h2 id="outbound-title">出貨作業（先進先出）</h2>
+                    <p>先出貨較早進貨的商品。若數量不足，系統會接著從下一筆庫存扣除。</p>
+                </header>
+
+                <section aria-label="出貨表單">
+                    <form id="outbound-form">
+                        <div>
+                            <label for="out-item">請選擇出貨品項</label>
+                            <select id="out-item" name="item" required>
+                                <option value="">— 請選擇蔬菜 —</option>
+                            </select>
+                        </div>
+
+                        <div id="fifo-suggestion" aria-live="polite">
+                            <h3>建議先取用</h3>
+                            <p>入庫時間：<strong id="fifo-date"></strong></p>
+                            <p>倉庫 <strong id="fifo-wh"></strong>　儲位 <strong id="fifo-bin"></strong></p>
+                            <p>這筆庫存可用：<strong id="fifo-qty"></strong> 箱</p>
+                            <p id="fifo-allocation"></p>
+                        </div>
+
+                        <p id="no-stock-msg" role="status">目前沒有可出貨的庫存。</p>
+
+                        <div>
+                            <div>
+                                <label for="out-qty">出貨數量（箱）</label>
+                                <input id="out-qty" name="quantity" type="number" min="1" step="1" required>
+                            </div>
+                            <div>
+                                <label for="out-operator">操作人</label>
+                                <input id="out-operator" name="operator" type="text" value="" placeholder="請輸入姓名" maxlength="60" required>
+                            </div>
+                        </div>
+
+                        <button id="out-submit" type="submit">確認出貨並扣除庫存</button>
+                    </form>
+                </section>
+            </section>
+
+            <!-- 4. 盤點與報廢頁面 -->
+            <section id="inventory" class="tab-content hidden" aria-labelledby="inventory-title" hidden>
+                <header>
+                    <h2 id="inventory-title">盤點與報廢</h2>
+                    <p>選擇倉庫與商品，核對實際數量。若有短少，請選擇原因並記錄。</p>
+                </header>
+
+                <section aria-label="盤點與報廢清單">
+                    <div>
+                        <label for="inv-wh-select">切換盤點倉庫</label>
+                        <select id="inv-wh-select">
+                            <option value="1">倉庫 1</option>
+                            <option value="2">倉庫 2</option>
+                        </select>
+                    </div>
+                    <div>
+                        <table>
+                            <caption class="sr-only">庫存盤點與報廢表</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">儲位</th>
+                                    <th scope="col">商品</th>
+                                    <th scope="col">系統記錄數量</th>
+                                    <th scope="col">實際可用數量</th>
+                                    <th scope="col">差異／報廢原因</th>
+                                    <th scope="col">操作人</th>
+                                    <th scope="col">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inv-table"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </section>
+
+            <!-- 系統狀態提示 -->
+            <p id="app-status" role="status" aria-live="polite">請選擇上方作業項目開始。</p>
+        </main>
+    </div>
+
+</body>
+</html>
