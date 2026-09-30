@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from backend.database import get_connection
+from backend.database import get_connection, initialize_database
 
 
 client = TestClient(app)
@@ -19,20 +19,28 @@ class TestAPI(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # 整組測試開始前，備份目前 Demo 資料庫
-        shutil.copy(DATABASE_PATH, BACKUP_PATH)
+        # 整組測試開始前，備份目前 Demo 資料庫（若存在）
+        if DATABASE_PATH.exists():
+            shutil.copy(DATABASE_PATH, BACKUP_PATH)
 
     def setUp(self):
-        # 每個測試開始前恢復相同的資料庫狀態
-        shutil.copy(BACKUP_PATH, DATABASE_PATH)
+        # 每個測試開始前都由 schema.sql 重建資料庫，
+        # 測試結果不受本機 Demo 資料庫目前內容影響
+        if DATABASE_PATH.exists():
+            DATABASE_PATH.unlink()
+
+        initialize_database()
 
     @classmethod
     def tearDownClass(cls):
-        # 全部測試完成後恢復原本 Demo 資料庫
-        shutil.copy(BACKUP_PATH, DATABASE_PATH)
-
+        # 全部測試完成後恢復原本 Demo 資料庫；
+        # 原本沒有資料庫時，留下 schema.sql 的初始資料
         if BACKUP_PATH.exists():
+            shutil.copy(BACKUP_PATH, DATABASE_PATH)
             BACKUP_PATH.unlink()
+        else:
+            DATABASE_PATH.unlink()
+            initialize_database()
 
     def test_01_get_inventory(self):
         response = client.get("/api/inventory")
@@ -59,10 +67,10 @@ class TestAPI(unittest.TestCase):
         self.assertIsInstance(first["warehouse"], str)
 
     def test_02_fifo_suggestion(self):
-        # 目前 Demo DB：
-        # batch 1 高麗菜 = 0
-        # batch 4 高麗菜 = 60（2026-09-23）
-        # batch 2 高麗菜 = 20（2026-09-25）
+        # schema.sql 初始資料：
+        # batch 1 高麗菜 = 50（2026-09-20，倉庫 1 A01）
+        # batch 4 高麗菜 = 60（2026-09-23，倉庫 2 B01）
+        # batch 2 高麗菜 = 30（2026-09-25，倉庫 1 A02）
         response = client.get(
             "/api/inventory/fifo",
             params={
@@ -78,17 +86,18 @@ class TestAPI(unittest.TestCase):
         self.assertTrue(data["success"])
         self.assertEqual(data["requested_quantity"], 70)
 
-        # 先從目前最舊且有庫存的 batch 4 出 60
-        self.assertEqual(data["outbound"][0]["id"], 4)
-        self.assertEqual(data["outbound"][0]["warehouse"], "2")
-        self.assertEqual(data["outbound"][0]["bin"], "B01")
-        self.assertEqual(data["outbound"][0]["quantity"], 60)
+        # 先從最舊的 batch 1 出 50
+        self.assertEqual(data["outbound"][0]["id"], 1)
+        self.assertEqual(data["outbound"][0]["warehouse"], "1")
+        self.assertEqual(data["outbound"][0]["bin"], "A01")
+        self.assertEqual(data["outbound"][0]["quantity"], 50)
 
-        # 再從 batch 2 出 10
-        self.assertEqual(data["outbound"][1]["id"], 2)
-        self.assertEqual(data["outbound"][1]["warehouse"], "1")
-        self.assertEqual(data["outbound"][1]["bin"], "A02")
-        self.assertEqual(data["outbound"][1]["quantity"], 10)
+        # 再跨倉庫從 batch 4 出 20
+        self.assertEqual(data["outbound"][1]["id"], 4)
+        self.assertEqual(data["outbound"][1]["warehouse"], "2")
+        self.assertEqual(data["outbound"][1]["bin"], "B01")
+        self.assertEqual(data["outbound"][1]["quantity"], 20)
+        self.assertEqual(len(data["outbound"]), 2)
 
     def test_03_outbound(self):
         response = client.post(
@@ -107,27 +116,21 @@ class TestAPI(unittest.TestCase):
         self.assertTrue(data["success"])
         self.assertEqual(data["operator"], "測試人員")
 
-        self.assertEqual(data["outbound"][0]["id"], 4)
-        self.assertEqual(data["outbound"][0]["quantity"], 60)
+        self.assertEqual(data["outbound"][0]["id"], 1)
+        self.assertEqual(data["outbound"][0]["quantity"], 50)
 
-        self.assertEqual(data["outbound"][1]["id"], 2)
-        self.assertEqual(data["outbound"][1]["quantity"], 10)
+        self.assertEqual(data["outbound"][1]["id"], 4)
+        self.assertEqual(data["outbound"][1]["quantity"], 20)
 
         # 確認庫存真的被扣除
         inventory = client.get("/api/inventory").json()
 
-        batch_4 = next(
-            batch for batch in inventory
-            if batch["id"] == 4
-        )
+        qty_by_id = {batch["id"]: batch["qty"] for batch in inventory}
 
-        batch_2 = next(
-            batch for batch in inventory
-            if batch["id"] == 2
-        )
-
-        self.assertEqual(batch_4["qty"], 0)
-        self.assertEqual(batch_2["qty"], 10)
+        self.assertEqual(qty_by_id[1], 0)
+        self.assertEqual(qty_by_id[4], 40)
+        # 較新的 batch 2 不應被動到
+        self.assertEqual(qty_by_id[2], 30)
 
     def test_04_inventory_adjustment(self):
         # batch 5 白蘿蔔原本 35，盤點後實際剩 30
