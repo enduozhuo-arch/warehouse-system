@@ -327,10 +327,24 @@ def set_batch_quantity(connection, batch_id, new_quantity):
         take_crates(connection, batch_id, codes[new_quantity:], "removed")
 
     elif new_quantity > len(codes):
-        last_seq = connection.execute(
-            "SELECT COALESCE(MAX(seq), 0) AS last_seq FROM crates WHERE batch_id = ?",
+        last = connection.execute(
+            """
+            SELECT crate_code, seq
+            FROM crates
+            WHERE batch_id = ?
+            ORDER BY seq DESC
+            LIMIT 1
+            """,
             (batch_id,),
-        ).fetchone()["last_seq"]
+        ).fetchone()
+
+        # 新箱號沿用這個批次既有箱號的前綴（初始資料為 seed-02-BOX-）
+        prefix = (
+            last["crate_code"].rsplit("-", 1)[0]
+            if last
+            else crate_code(batch_id, 0).rsplit("-", 1)[0]
+        )
+        last_seq = last["seq"] if last else 0
 
         connection.executemany(
             """
@@ -338,7 +352,7 @@ def set_batch_quantity(connection, batch_id, new_quantity):
             VALUES (?, ?, ?, 'in_stock')
             """,
             [
-                (crate_code(batch_id, seq), batch_id, seq)
+                (f"{prefix}-{seq:03d}", batch_id, seq)
                 for seq in range(last_seq + 1, last_seq + 1 + new_quantity - len(codes))
             ],
         )

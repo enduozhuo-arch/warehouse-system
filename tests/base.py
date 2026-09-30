@@ -1,10 +1,12 @@
 import shutil
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from backend.database import reset_database
+from backend.helpers import today_text
 from backend.main import app
 
 
@@ -13,6 +15,15 @@ client = TestClient(app)
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "database" / "warehouse.db"
 BACKUP_PATH = BASE_DIR / "database" / "warehouse_test_backup.db"
+
+
+def day(offset=0):
+    # schema.sql 的初始資料以重建資料庫當天為基準，測試用同樣方式推算日期
+    return (date.fromisoformat(today_text()) + timedelta(days=offset)).isoformat()
+
+
+def seed_received_at(days_old):
+    return f"{day(-days_old)}T08:00:00+08:00"
 
 
 class DatabaseTestCase(unittest.TestCase):

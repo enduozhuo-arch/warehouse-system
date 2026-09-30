@@ -23,6 +23,29 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 
 每個測試都會由 `schema.sql` 重建資料庫，跑完後還原原本的 Demo 資料庫。
 
+## 初始資料
+
+`schema.sql` 的初始資料與前端 `fronted/app.js` 的範例資料相同。
+入庫時間與效期以「重建資料庫當天」為基準推算，所以示範當天一定看得到效期與久放提醒。
+
+| id | 商品 | 倉庫 | 儲位 | 數量 | 入庫 | 效期 | 批號 | 儲位代碼 | 箱號 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 甘藍菜 | 1 | A-10 | 5 | 5 天前 | 8 天後 | ZN-1-SEED-01 | LOC-1-A10 | seed-01-BOX-001～005 |
+| 2 | 青江菜 | 1 | B-02 | 3 | 9 天前 | 2 天後 | ZN-1-SEED-02 | LOC-1-B02 | seed-02-BOX-001～003 |
+| 3 | 青江菜 | 2 | C-05 | 10 | 3 天前 | 12 天後 | ZN-2-SEED-03 | LOC-2-C05 | seed-03-BOX-001～010 |
+| 4 | 高麗菜 | 2 | D-01 | 8 | 4 天前 | 15 天後 | ZN-2-SEED-04 | LOC-2-D01 | seed-04-BOX-001～008 |
+| 5 | 番茄 | 1 | A-03 | 6 | 6 天前 | 6 天後 | ZN-1-SEED-05 | LOC-1-A03 | seed-05-BOX-001～006 |
+
+其他初始設定：人員「李太太（管理者）」「倉管人員」；倉庫 1 甘藍菜安全庫存 4 箱；青江菜久放門檻 7 天。
+
+### 上台示範（NO1）對應的 API
+
+1. `POST /api/pick-tasks`：`{"item": "青江菜", "quantity": 1, "operator": "李太太"}` → 回傳指示倉庫 1、儲位 B-02。
+2. 直接 `POST /api/pick-tasks/1/confirm` → 400，庫存不變。
+3. `POST /api/pick-tasks/1/verify-location`：`{"locationCode": "LOC-1-B02"}`。
+4. `POST /api/pick-tasks/1/scan`：`{"crateCode": "seed-02-BOX-001"}`。
+5. `POST /api/pick-tasks/1/confirm` → 青江菜少一箱，`GET /api/transactions` 多一筆出貨紀錄。
+
 ## 共用格式
 
 ### 批次（batch）
@@ -35,15 +58,16 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 | bin | 儲位代碼 |
 | qty | 批次目前庫存數量（箱） |
 | receivedAt | 入庫時間，ISO 8601（+08:00），由伺服器記錄 |
-| lotNumber | 批號，例如 `ZN-1-20260920-000001` |
+| lotNumber | 批號，例如 `ZN-1-SEED-02`（初始資料）、`ZN-1-20260930-000006`（新入庫） |
 | expiryDate | 效期 `YYYY-MM-DD`，未設定為空字串 |
-| locationCode | 儲位 QR Code 內容，例如 `LOC-1-A01` |
-| crateCodes | 目前在庫的箱號，例如 `["1-BOX-001", ...]`（只有部分 API 回傳） |
+| locationCode | 儲位 QR Code 內容，例如 `LOC-1-B02` |
+| crateCodes | 目前在庫的箱號，例如 `["seed-02-BOX-001", ...]`（只有部分 API 回傳） |
 
 ### 代碼規則
 
 - 儲位代碼：`LOC-{倉庫}-{儲位去掉符號}`，例如倉庫 1 的 `B-02` → `LOC-1-B02`。比對時不分大小寫。
-- 箱號：`{批次編號}-BOX-{三位流水號}`，例如 `6-BOX-001`。
+- 箱號：新入庫的批次為 `{批次編號}-BOX-{三位流水號}`，例如 `6-BOX-001`；
+  初始資料的批次沿用前端範例的格式 `seed-02-BOX-001`。
 
 ### 錯誤回應
 
@@ -72,10 +96,10 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
   "id": 1,
   "at": "2026-09-30T18:05:48+08:00",
   "kind": "出貨",
-  "name": "高麗菜",
+  "name": "青江菜",
   "warehouse": "1",
-  "bin": "A01",
-  "lotNumber": "ZN-1-20260920-000001",
+  "bin": "B-02",
+  "lotNumber": "ZN-1-SEED-02",
   "quantity": -1,
   "operator": "李太太",
   "operatorRole": "manager",
@@ -100,7 +124,7 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 ### POST /api/pick-tasks
 
 ```json
-{ "item": "高麗菜", "quantity": 52, "operator": "李太太" }
+{ "item": "青江菜", "quantity": 5, "operator": "李太太" }
 ```
 
 伺服器依入庫時間（FIFO）排出取貨計畫，可跨倉庫。庫存不足回 400。
@@ -110,29 +134,29 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 ```json
 {
   "id": 1,
-  "name": "高麗菜",
-  "quantity": 52,
+  "name": "青江菜",
+  "quantity": 5,
   "operator": "李太太",
   "status": "open",
   "plan": [
     {
-      "batchId": 1, "warehouse": "1", "bin": "A01",
-      "lotNumber": "ZN-1-20260920-000001",
-      "receivedAt": "2026-09-20T08:00:00+08:00",
-      "locationCode": "LOC-1-A01",
-      "quantity": 50, "scanned": 0
+      "batchId": 2, "warehouse": "1", "bin": "B-02",
+      "lotNumber": "ZN-1-SEED-02",
+      "receivedAt": "2026-09-21T08:00:00+08:00",
+      "locationCode": "LOC-1-B02",
+      "quantity": 3, "scanned": 0
     },
     {
-      "batchId": 4, "warehouse": "2", "bin": "B01",
-      "lotNumber": "ZN-2-20260923-000004",
-      "receivedAt": "2026-09-23T11:00:00+08:00",
-      "locationCode": "LOC-2-B01",
+      "batchId": 3, "warehouse": "2", "bin": "C-05",
+      "lotNumber": "ZN-2-SEED-03",
+      "receivedAt": "2026-09-27T08:00:00+08:00",
+      "locationCode": "LOC-2-C05",
       "quantity": 2, "scanned": 0
     }
   ],
   "scanned": [],
   "verifiedBatchId": null,
-  "next": { "batchId": 1, "locationCode": "LOC-1-A01", "...": "與 plan 項目相同" },
+  "next": { "batchId": 2, "locationCode": "LOC-1-B02", "...": "與 plan 項目相同" },
   "ready": false
 }
 ```
@@ -145,7 +169,7 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 ### POST /api/pick-tasks/{id}/verify-location
 
 ```json
-{ "locationCode": "LOC-1-A01" }
+{ "locationCode": "LOC-1-B02" }
 ```
 
 必須是 `next` 指定的儲位，否則回 400（訊息會提示正確的儲位代碼）。
@@ -153,7 +177,7 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 ### POST /api/pick-tasks/{id}/scan
 
 ```json
-{ "crateCode": "1-BOX-001" }
+{ "crateCode": "seed-02-BOX-001" }
 ```
 
 - 尚未核對儲位：409。
@@ -184,7 +208,7 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 
 ```json
 {
-  "item": "青江菜",
+  "item": "白蘿蔔",
   "warehouse": "1",
   "bin": "B-02",
   "quantity": 2,
@@ -203,7 +227,7 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
   "operator": "倉管人員",
   "status": "open",
   "batch": {
-    "id": 6, "name": "青江菜", "warehouse": "1", "bin": "B-02", "qty": 2,
+    "id": 6, "name": "白蘿蔔", "warehouse": "1", "bin": "B-02", "qty": 2,
     "receivedAt": "",
     "lotNumber": "ZN-1-20260930-000006",
     "expiryDate": "2026-10-15",
@@ -244,11 +268,11 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
   "completed": false,
   "items": [
     {
-      "id": 5, "name": "白蘿蔔", "warehouse": "2", "bin": "B02", "qty": 30,
-      "lotNumber": "ZN-2-20260926-000005",
+      "id": 5, "name": "番茄", "warehouse": "1", "bin": "A-03", "qty": 4,
+      "lotNumber": "ZN-1-SEED-05",
       "counted": true,
-      "oldQty": 35,
-      "actual": 30,
+      "oldQty": 6,
+      "actual": 4,
       "reason": "腐爛報廢",
       "note": "",
       "operator": "倉管人員",
@@ -263,7 +287,7 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 ```json
 {
   "id": 5,
-  "actual_quantity": 30,
+  "actual_quantity": 4,
   "reason": "腐爛報廢",
   "note": "",
   "operator": "倉管人員"
@@ -288,9 +312,9 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 ```json
 {
   "today": "2026-09-30",
-  "expiry": [ { "id": 1, "name": "高麗菜", "daysLeft": 2, "status": "2 天內到期", "...": "批次欄位" } ],
-  "aging": [ { "id": 1, "name": "高麗菜", "days": 10, "threshold": 7, "...": "批次欄位" } ],
-  "safety": [ { "warehouse": "1", "name": "番茄", "quantity": 40, "level": 50 } ]
+  "expiry": [ { "id": 2, "name": "青江菜", "daysLeft": 2, "status": "2 天內到期", "...": "批次欄位" } ],
+  "aging": [ { "id": 2, "name": "青江菜", "days": 9, "threshold": 7, "...": "批次欄位" } ],
+  "safety": [ { "warehouse": "1", "name": "甘藍菜", "quantity": 3, "level": 4 } ]
 }
 ```
 
@@ -301,13 +325,13 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 ### 安全庫存：GET /api/safety-levels、PUT /api/safety-levels
 
 ```json
-{ "warehouse": "1", "name": "番茄", "quantity": 50 }
+{ "warehouse": "1", "name": "甘藍菜", "quantity": 4 }
 ```
 
 ### 久放門檻：GET /api/aging-rules、PUT /api/aging-rules
 
 ```json
-{ "name": "高麗菜", "days": 7 }
+{ "name": "青江菜", "days": 7 }
 ```
 
 ### GET /api/waste-summary
@@ -316,8 +340,8 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 
 ```json
 [
-  { "reason": "腐爛報廢", "quantity": 8 },
-  { "reason": "破損報廢", "quantity": 2 }
+  { "reason": "腐爛報廢", "quantity": 3 },
+  { "reason": "破損報廢", "quantity": 1 }
 ]
 ```
 
@@ -338,7 +362,7 @@ python -m unittest tests.test_fifo tests.test_inventory tests.test_api tests.tes
 
 | API | 說明 |
 | --- | --- |
-| GET /api/inventory/fifo?item=高麗菜&quantity=60 | 只查詢 FIFO 出貨建議，不扣庫存 |
+| GET /api/inventory/fifo?item=青江菜&quantity=5 | 只查詢 FIFO 出貨建議，不扣庫存 |
 | POST /api/inbound | 直接進貨：`item`、`warehouse`、`bin`、`quantity`、`operator`、`expiryDate`（選填） |
 | POST /api/outbound | 直接依 FIFO 出貨：`item`、`quantity`、`operator` |
 | PATCH /api/inventory | 單筆盤點調整：`id`、`actual_quantity`、`reason`、`note`、`operator` |

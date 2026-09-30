@@ -7,7 +7,7 @@ class TestInboundTasks(DatabaseTestCase):
 
     def create_task(self, **overrides):
         body = {
-            "item": "青江菜",
+            "item": "白蘿蔔",
             "warehouse": "1",
             "bin": "b-02",
             "quantity": 2,
@@ -63,7 +63,7 @@ class TestInboundTasks(DatabaseTestCase):
         self.assertEqual(self.scan(task_id, "6-BOX-001").status_code, 409)
 
         # 掃錯儲位
-        self.assertEqual(self.verify(task_id, "LOC-1-A01").status_code, 400)
+        self.assertEqual(self.verify(task_id, "LOC-1-A10").status_code, 400)
         self.assertEqual(self.verify(task_id, "LOC-1-B02").status_code, 200)
 
         # 箱數還沒掃滿不能確認入庫
@@ -71,7 +71,7 @@ class TestInboundTasks(DatabaseTestCase):
         self.assertEqual(self.confirm(task_id).status_code, 400)
 
         # 不屬於這張收貨單的箱號、重複掃描
-        self.assertEqual(self.scan(task_id, "1-BOX-001").status_code, 400)
+        self.assertEqual(self.scan(task_id, "seed-01-BOX-001").status_code, 400)
         self.assertEqual(self.scan(task_id, "6-BOX-001").status_code, 409)
 
         self.assertTrue(self.scan(task_id, "6-BOX-002").json()["ready"])
@@ -83,7 +83,7 @@ class TestInboundTasks(DatabaseTestCase):
         batch = response.json()["task"]["batch"]
 
         self.assertEqual(batch["id"], 6)
-        self.assertEqual(batch["name"], "青江菜")
+        self.assertEqual(batch["name"], "白蘿蔔")
         self.assertEqual(batch["warehouse"], "1")
         self.assertEqual(batch["qty"], 2)
         # 入庫時間由伺服器在確認入庫時記錄
@@ -91,7 +91,7 @@ class TestInboundTasks(DatabaseTestCase):
 
         self.assertEqual(self.qty_by_id()[6], 2)
         # 原本沒有的商品會自動建立
-        self.assertIn("青江菜", client.get("/api/products").json())
+        self.assertIn("白蘿蔔", client.get("/api/products").json())
 
         transaction = client.get("/api/transactions").json()[0]
         self.assertEqual(transaction["kind"], "進貨")
@@ -101,16 +101,16 @@ class TestInboundTasks(DatabaseTestCase):
         # 新入庫的批次可以用取貨工作掃碼出貨
         pick = client.post(
             "/api/pick-tasks",
-            json={"item": "青江菜", "quantity": 1, "operator": "李太太"},
+            json={"item": "白蘿蔔", "quantity": 1, "operator": "李太太"},
         ).json()
         self.assertEqual(pick["next"]["locationCode"], "LOC-1-B02")
 
     def test_existing_bin_is_matched_without_dash(self):
-        # A-01 與既有儲位 A01 是同一個位置
-        task = self.create_task(item="高麗菜", bin="A-01").json()
+        # A10 與既有儲位 A-10 是同一個位置
+        task = self.create_task(item="甘藍菜", bin="a10").json()
 
-        self.assertEqual(task["batch"]["bin"], "A01")
-        self.assertEqual(task["locationCode"], "LOC-1-A01")
+        self.assertEqual(task["batch"]["bin"], "A-10")
+        self.assertEqual(task["locationCode"], "LOC-1-A10")
 
     def test_cancel_and_batch_id_is_not_reused(self):
         first = self.create_task().json()

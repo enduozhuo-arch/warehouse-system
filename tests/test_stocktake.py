@@ -28,21 +28,22 @@ class TestStocktake(DatabaseTestCase):
     def test_warehouse_filter_keeps_overall_progress(self):
         data = client.get("/api/stocktake", params={"warehouse": "2"}).json()
 
-        self.assertEqual([item["id"] for item in data["items"]], [4, 5])
+        self.assertEqual([item["id"] for item in data["items"]], [4, 3])
         self.assertEqual(data["total"], 5)
 
     def test_count_with_waste_saves_before_and_after(self):
-        response = self.count(id=5, actual_quantity=30, reason="腐爛報廢")
+        # batch 5 番茄原本 6 箱，盤點後實際剩 4 箱
+        response = self.count(id=5, actual_quantity=4, reason="腐爛報廢")
 
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
 
         self.assertEqual(data["kind"], "報廢")
-        self.assertEqual(data["oldQty"], 35)
-        self.assertEqual(data["actual"], 30)
-        self.assertEqual(data["qty"], 30)
-        self.assertEqual(data["difference"], -5)
+        self.assertEqual(data["oldQty"], 6)
+        self.assertEqual(data["actual"], 4)
+        self.assertEqual(data["qty"], 4)
+        self.assertEqual(data["difference"], -2)
         self.assertEqual(data["counted"], 1)
         self.assertEqual(data["total"], 5)
 
@@ -52,27 +53,27 @@ class TestStocktake(DatabaseTestCase):
         )
 
         self.assertTrue(item["counted"])
-        self.assertEqual(item["oldQty"], 35)
-        self.assertEqual(item["actual"], 30)
+        self.assertEqual(item["oldQty"], 6)
+        self.assertEqual(item["actual"], 4)
         self.assertEqual(item["reason"], "腐爛報廢")
         self.assertEqual(item["operator"], "倉管人員")
         self.assertTrue(item["countedAt"])
 
         transaction = client.get("/api/transactions").json()[0]
         self.assertEqual(transaction["kind"], "報廢")
-        self.assertEqual(transaction["quantity"], -5)
+        self.assertEqual(transaction["quantity"], -2)
 
         # 報廢後在庫箱號數量與庫存數量一致
-        self.assertEqual(len(self.batch(5)["crateCodes"]), 30)
+        self.assertEqual(len(self.batch(5)["crateCodes"]), 4)
 
     def test_difference_requires_reason(self):
-        response = self.count(id=5, actual_quantity=30)
+        response = self.count(id=5, actual_quantity=4)
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(self.qty_by_id()[5], 35)
+        self.assertEqual(self.qty_by_id()[5], 6)
 
     def test_count_without_difference_marks_counted(self):
-        response = self.count(id=3, actual_quantity=40)
+        response = self.count(id=3, actual_quantity=10)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["difference"], 0)
@@ -82,13 +83,17 @@ class TestStocktake(DatabaseTestCase):
         self.assertEqual(client.get("/api/stocktake").json()["counted"], 1)
 
     def test_count_increase_adds_crates(self):
-        response = self.count(id=2, actual_quantity=32, reason="盤點差異")
+        response = self.count(id=2, actual_quantity=5, reason="盤點差異")
 
         self.assertEqual(response.json()["kind"], "盤點調整")
 
         batch = self.batch(2)
-        self.assertEqual(batch["qty"], 32)
-        self.assertEqual(batch["crateCodes"][-2:], ["2-BOX-031", "2-BOX-032"])
+        self.assertEqual(batch["qty"], 5)
+        # 新箱號沿用該批次的箱號格式
+        self.assertEqual(
+            batch["crateCodes"][-2:],
+            ["seed-02-BOX-004", "seed-02-BOX-005"],
+        )
 
     def test_completed_when_all_batches_counted(self):
         for batch_id, quantity in self.qty_by_id().items():

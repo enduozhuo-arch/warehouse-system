@@ -40,7 +40,7 @@ CREATE TABLE inventory_batches (
         REFERENCES locations(location_id)
 );
 -- =========================================
--- 測試資料
+-- 初始資料（與前端 fronted/app.js 的範例資料相同）
 -- =========================================
 
 -- 兩個倉庫
@@ -50,27 +50,32 @@ INSERT INTO warehouses (warehouse_id, warehouse_name) VALUES
 
 -- 商品
 INSERT INTO products (product_id, product_name) VALUES
-(1, '高麗菜'),
-(2, '番茄'),
-(3, '白蘿蔔');
+(1, '甘藍菜'),
+(2, '青江菜'),
+(3, '高麗菜'),
+(4, '番茄');
 
 -- 儲位
 INSERT INTO locations (location_id, warehouse_id, location_code) VALUES
-(1, 1, 'A01'),
-(2, 1, 'A02'),
-(3, 1, 'A03'),
-(4, 2, 'B01'),
-(5, 2, 'B02');
+(1, 1, 'A-10'),
+(2, 1, 'B-02'),
+(3, 2, 'C-05'),
+(4, 2, 'D-01'),
+(5, 1, 'A-03');
 
 -- 庫存批次
+-- 入庫時間與效期以「重建資料庫當天」為基準往前／往後推算（台灣時間），
+-- 讓效期與久放提醒在示範當天看得到。
+-- 青江菜有兩批：batch 2 較早入庫，FIFO 會先出這一批。
 INSERT INTO inventory_batches
 (batch_id, product_id, location_id, quantity, received_at, lot_number, expiry_date)
 VALUES
-(1, 1, 1, 50, '2026-09-20 08:00:00', 'ZN-1-20260920-000001', '2026-10-02'),
-(2, 1, 2, 30, '2026-09-25 10:00:00', 'ZN-1-20260925-000002', '2026-10-09'),
-(3, 2, 3, 40, '2026-09-22 09:00:00', 'ZN-1-20260922-000003', '2026-10-06'),
-(4, 1, 4, 60, '2026-09-23 11:00:00', 'ZN-2-20260923-000004', '2026-10-07'),
-(5, 3, 5, 35, '2026-09-26 14:00:00', 'ZN-2-20260926-000005', '2026-10-20');
+(1, 1, 1, 5,  date('now', '+8 hours', '-5 days') || ' 08:00:00', 'ZN-1-SEED-01', date('now', '+8 hours', '+8 days')),
+(2, 2, 2, 3,  date('now', '+8 hours', '-9 days') || ' 08:00:00', 'ZN-1-SEED-02', date('now', '+8 hours', '+2 days')),
+(3, 2, 3, 10, date('now', '+8 hours', '-3 days') || ' 08:00:00', 'ZN-2-SEED-03', date('now', '+8 hours', '+12 days')),
+(4, 3, 4, 8,  date('now', '+8 hours', '-4 days') || ' 08:00:00', 'ZN-2-SEED-04', date('now', '+8 hours', '+15 days')),
+(5, 4, 5, 6,  date('now', '+8 hours', '-6 days') || ' 08:00:00', 'ZN-1-SEED-05', date('now', '+8 hours', '+6 days'));
+
 CREATE TABLE inventory_transactions (
     transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
     batch_id INTEGER NOT NULL,
@@ -187,7 +192,7 @@ CREATE TABLE users (
     role VARCHAR(20) NOT NULL
 );
 
--- 依初始庫存數量替每個批次產生箱號，例如 1-BOX-001
+-- 依初始庫存數量替每個批次產生箱號，格式與前端範例資料相同：seed-02-BOX-001
 WITH RECURSIVE box_seq(n) AS (
     SELECT 1
     UNION ALL
@@ -195,7 +200,7 @@ WITH RECURSIVE box_seq(n) AS (
 )
 INSERT INTO crates (crate_code, batch_id, seq, status)
 SELECT
-    printf('%d-BOX-%03d', ib.batch_id, box_seq.n),
+    printf('seed-%02d-BOX-%03d', ib.batch_id, box_seq.n),
     ib.batch_id,
     box_seq.n,
     'in_stock'
@@ -208,7 +213,7 @@ INSERT INTO users (name, role) VALUES
 ('倉管人員', 'warehouse');
 
 INSERT INTO safety_levels (warehouse_id, product_name, quantity) VALUES
-(1, '番茄', 50);
+(1, '甘藍菜', 4);
 
 INSERT INTO aging_rules (product_name, days) VALUES
-('高麗菜', 7);
+('青江菜', 7);

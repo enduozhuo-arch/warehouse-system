@@ -4,10 +4,11 @@ from tests.base import DatabaseTestCase, client
 
 
 class TestPickTasks(DatabaseTestCase):
-    # schema.sql 初始資料的高麗菜（依入庫時間）：
-    # batch 1 = 50（倉庫 1 A01）→ batch 4 = 60（倉庫 2 B01）→ batch 2 = 30（倉庫 1 A02）
+    # schema.sql 初始資料的青江菜（依入庫時間）：
+    # batch 2 = 3 箱（倉庫 1 B-02，箱號 seed-02-BOX-001～003）
+    # → batch 3 = 10 箱（倉庫 2 C-05，箱號 seed-03-BOX-001～010）
 
-    def create_task(self, quantity, item="高麗菜"):
+    def create_task(self, quantity, item="青江菜"):
         response = client.post(
             "/api/pick-tasks",
             json={"item": item, "quantity": quantity, "operator": "李太太"},
@@ -36,19 +37,19 @@ class TestPickTasks(DatabaseTestCase):
         self.assertEqual(task["status"], "open")
         self.assertFalse(task["ready"])
         self.assertEqual(len(task["plan"]), 1)
-        self.assertEqual(task["next"]["batchId"], 1)
+        self.assertEqual(task["next"]["batchId"], 2)
         self.assertEqual(task["next"]["warehouse"], "1")
-        self.assertEqual(task["next"]["bin"], "A01")
-        self.assertEqual(task["next"]["locationCode"], "LOC-1-A01")
-        self.assertEqual(task["next"]["lotNumber"], "ZN-1-20260920-000001")
+        self.assertEqual(task["next"]["bin"], "B-02")
+        self.assertEqual(task["next"]["locationCode"], "LOC-1-B02")
+        self.assertEqual(task["next"]["lotNumber"], "ZN-1-SEED-02")
 
         # 建立取貨工作不會扣庫存
-        self.assertEqual(self.qty_by_id()[1], 50)
+        self.assertEqual(self.qty_by_id()[2], 3)
 
     def test_create_rejects_insufficient_stock(self):
         response = client.post(
             "/api/pick-tasks",
-            json={"item": "高麗菜", "quantity": 141, "operator": "李太太"},
+            json={"item": "青江菜", "quantity": 14, "operator": "李太太"},
         )
 
         self.assertEqual(response.status_code, 400)
@@ -60,118 +61,135 @@ class TestPickTasks(DatabaseTestCase):
         response = self.confirm(task["id"])
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(self.qty_by_id()[1], 50)
+        self.assertEqual(self.qty_by_id()[2], 3)
         self.assertEqual(client.get("/api/transactions").json(), [])
 
     def test_wrong_location_is_rejected(self):
         task = self.create_task(1)
 
-        # 倉庫 1 A02 是較新的高麗菜，不是 FIFO 指定的儲位
-        response = self.verify(task["id"], "LOC-1-A02")
+        # 倉庫 2 C-05 是較新的青江菜，不是 FIFO 指定的儲位
+        response = self.verify(task["id"], "LOC-2-C05")
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("LOC-1-A01", response.json()["detail"])
+        self.assertIn("LOC-1-B02", response.json()["detail"])
 
     def test_scan_requires_location_check(self):
         task = self.create_task(1)
 
-        response = self.scan(task["id"], "1-BOX-001")
+        response = self.scan(task["id"], "seed-02-BOX-001")
 
         self.assertEqual(response.status_code, 409)
 
     def test_wrong_batch_crate_is_rejected(self):
         task = self.create_task(1)
-        self.assertEqual(self.verify(task["id"], "loc-1-a01").status_code, 200)
+        self.assertEqual(self.verify(task["id"], "loc-1-b02").status_code, 200)
 
-        # 較新批次（batch 2）的箱子、不存在的箱號都要拒絕
-        self.assertEqual(self.scan(task["id"], "2-BOX-001").status_code, 400)
+        # 較新批次（batch 3）的箱子、不存在的箱號都要拒絕
+        self.assertEqual(
+            self.scan(task["id"], "seed-03-BOX-001").status_code,
+            400,
+        )
         self.assertEqual(self.scan(task["id"], "NO-SUCH-BOX").status_code, 400)
 
     def test_duplicate_scan_is_rejected(self):
         task = self.create_task(2)
-        self.verify(task["id"], "LOC-1-A01")
+        self.verify(task["id"], "LOC-1-B02")
 
-        self.assertEqual(self.scan(task["id"], "1-BOX-001").status_code, 200)
-        self.assertEqual(self.scan(task["id"], "1-BOX-001").status_code, 409)
+        first = self.scan(task["id"], "seed-02-BOX-001")
+        second = self.scan(task["id"], "seed-02-BOX-001")
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 409)
 
     def test_full_flow_deducts_stock_and_records_transaction(self):
+        # 對應上台示範：青江菜 1 箱 → LOC-1-B02 → seed-02-BOX-001
         task = self.create_task(1)
-        self.verify(task["id"], "LOC-1-A01")
+        self.verify(task["id"], "LOC-1-B02")
 
-        scanned = self.scan(task["id"], "1-BOX-007").json()
+        scanned = self.scan(task["id"], "seed-02-BOX-001").json()
 
         self.assertTrue(scanned["ready"])
         self.assertIsNone(scanned["next"])
-        self.assertEqual(scanned["scanned"][0]["crateCode"], "1-BOX-007")
+        self.assertEqual(
+            scanned["scanned"][0]["crateCode"],
+            "seed-02-BOX-001",
+        )
 
         response = self.confirm(task["id"])
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["task"]["status"], "confirmed")
-        self.assertEqual(self.qty_by_id()[1], 49)
+        self.assertEqual(self.qty_by_id()[2], 2)
 
         # 被取出的箱號不再屬於在庫箱號
-        batch_1 = next(
+        batch_2 = next(
             batch for batch in client.get("/api/inventory").json()
-            if batch["id"] == 1
+            if batch["id"] == 2
         )
-        self.assertNotIn("1-BOX-007", batch_1["crateCodes"])
-        self.assertEqual(len(batch_1["crateCodes"]), 49)
+        self.assertEqual(
+            batch_2["crateCodes"],
+            ["seed-02-BOX-002", "seed-02-BOX-003"],
+        )
 
         transaction = client.get("/api/transactions").json()[0]
         self.assertEqual(transaction["kind"], "出貨")
         self.assertEqual(transaction["quantity"], -1)
         self.assertEqual(transaction["operator"], "李太太")
         self.assertEqual(transaction["operatorRole"], "manager")
-        self.assertEqual(transaction["lotNumber"], "ZN-1-20260920-000001")
+        self.assertEqual(transaction["name"], "青江菜")
+        self.assertEqual(transaction["lotNumber"], "ZN-1-SEED-02")
 
         # 已結案的工作不能再操作
         self.assertEqual(self.confirm(task["id"]).status_code, 409)
 
     def test_multi_batch_task_requires_new_location_check(self):
-        # 52 箱：batch 1 出 50，再跨倉庫從 batch 4 出 2
-        task = self.create_task(52)
+        # 5 箱：batch 2 出 3，再跨倉庫從 batch 3 出 2
+        task = self.create_task(5)
 
         self.assertEqual(
             [(line["batchId"], line["quantity"]) for line in task["plan"]],
-            [(1, 50), (4, 2)],
+            [(2, 3), (3, 2)],
         )
 
-        self.verify(task["id"], "LOC-1-A01")
+        self.verify(task["id"], "LOC-1-B02")
 
-        for seq in range(1, 51):
-            response = self.scan(task["id"], f"1-BOX-{seq:03d}")
+        for seq in range(1, 4):
+            response = self.scan(task["id"], f"seed-02-BOX-{seq:03d}")
             self.assertEqual(response.status_code, 200)
 
         state = response.json()
-        self.assertEqual(state["next"]["batchId"], 4)
+        self.assertEqual(state["next"]["batchId"], 3)
         self.assertIsNone(state["verifiedBatchId"])
 
         # 換批次後沒重新核對儲位就不能掃
-        self.assertEqual(self.scan(task["id"], "4-BOX-001").status_code, 409)
+        self.assertEqual(
+            self.scan(task["id"], "seed-03-BOX-001").status_code,
+            409,
+        )
 
-        self.verify(task["id"], "LOC-2-B01")
-        self.scan(task["id"], "4-BOX-001")
-        self.scan(task["id"], "4-BOX-002")
+        self.verify(task["id"], "LOC-2-C05")
+        self.scan(task["id"], "seed-03-BOX-001")
+        self.scan(task["id"], "seed-03-BOX-002")
 
         self.assertEqual(self.confirm(task["id"]).status_code, 200)
 
         quantities = self.qty_by_id()
-        self.assertEqual(quantities[1], 0)
-        self.assertEqual(quantities[4], 58)
-        self.assertEqual(quantities[2], 30)
+        self.assertEqual(quantities[2], 0)
+        self.assertEqual(quantities[3], 8)
+        # 其他商品不受影響
+        self.assertEqual(quantities[1], 5)
 
     def test_confirm_fails_when_stock_changed(self):
         task = self.create_task(1)
-        self.verify(task["id"], "LOC-1-A01")
-        self.scan(task["id"], "1-BOX-050")
+        self.verify(task["id"], "LOC-1-B02")
+        self.scan(task["id"], "seed-02-BOX-003")
 
         # 掃描後、確認前，這一箱被盤點報廢掉了
         client.patch(
             "/api/inventory",
             json={
-                "id": 1,
-                "actual_quantity": 49,
+                "id": 2,
+                "actual_quantity": 2,
                 "reason": "rotten",
                 "operator": "倉管人員",
             },
@@ -180,18 +198,18 @@ class TestPickTasks(DatabaseTestCase):
         response = self.confirm(task["id"])
 
         self.assertEqual(response.status_code, 409)
-        self.assertEqual(self.qty_by_id()[1], 49)
+        self.assertEqual(self.qty_by_id()[2], 2)
 
     def test_cancel_keeps_stock(self):
         task = self.create_task(1)
-        self.verify(task["id"], "LOC-1-A01")
-        self.scan(task["id"], "1-BOX-001")
+        self.verify(task["id"], "LOC-1-B02")
+        self.scan(task["id"], "seed-02-BOX-001")
 
         response = client.post(f"/api/pick-tasks/{task['id']}/cancel")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["task"]["status"], "cancelled")
-        self.assertEqual(self.qty_by_id()[1], 50)
+        self.assertEqual(self.qty_by_id()[2], 3)
         self.assertEqual(client.get("/api/pick-tasks").json(), [])
 
     def test_unknown_task_returns_404(self):
