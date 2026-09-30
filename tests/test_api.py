@@ -1,46 +1,8 @@
-import shutil
-import unittest
-from pathlib import Path
-
-from fastapi.testclient import TestClient
-
-from backend.main import app
-from backend.database import get_connection, initialize_database
+from backend.database import get_connection
+from tests.base import DatabaseTestCase, client
 
 
-client = TestClient(app)
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATABASE_PATH = BASE_DIR / "database" / "warehouse.db"
-BACKUP_PATH = BASE_DIR / "database" / "warehouse_test_backup.db"
-
-
-class TestAPI(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        # 整組測試開始前，備份目前 Demo 資料庫（若存在）
-        if DATABASE_PATH.exists():
-            shutil.copy(DATABASE_PATH, BACKUP_PATH)
-
-    def setUp(self):
-        # 每個測試開始前都由 schema.sql 重建資料庫，
-        # 測試結果不受本機 Demo 資料庫目前內容影響
-        if DATABASE_PATH.exists():
-            DATABASE_PATH.unlink()
-
-        initialize_database()
-
-    @classmethod
-    def tearDownClass(cls):
-        # 全部測試完成後恢復原本 Demo 資料庫；
-        # 原本沒有資料庫時，留下 schema.sql 的初始資料
-        if BACKUP_PATH.exists():
-            shutil.copy(BACKUP_PATH, DATABASE_PATH)
-            BACKUP_PATH.unlink()
-        else:
-            DATABASE_PATH.unlink()
-            initialize_database()
+class TestAPI(DatabaseTestCase):
 
     def test_01_get_inventory(self):
         response = client.get("/api/inventory")
