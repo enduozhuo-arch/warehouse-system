@@ -1,0 +1,553 @@
+/*
+ * 竹南冷凍倉儲管理系統｜第三版前端樣式
+ */
+
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    --page-bg: #f3f5f7;
+    --surface: #ffffff;
+    --surface-muted: #f7f9fa;
+    --text: #202a32;
+    --text-muted: #596773;
+    --border: #cbd3da;
+    --primary: #245c4a;
+    --primary-dark: #194538;
+    --primary-soft: #e8f2ee;
+    --warning: #805600;
+    --warning-soft: #fff4d6;
+    --danger: #9f2118;
+    --danger-soft: #ffebe8;
+    --success: #17623f;
+    --success-soft: #e8f4ed;
+    --radius: 10px;
+    --shadow: 0 2px 8px rgb(24 39 48 / 7%);
+    --content-width: 1400px;
+    --form-label-width: 160px;
+}
+
+html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+}
+
+body {
+    min-width: 320px;
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--text);
+    font-family: "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+}
+
+button,
+input,
+select {
+    font: inherit;
+}
+
+button,
+input,
+select {
+    min-height: 46px;
+}
+
+input,
+select {
+    max-width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #9daab4;
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--text);
+}
+
+input::placeholder {
+    color: #687580;
+    opacity: 1;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+    outline: 3px solid #267a60;
+    outline-offset: 3px;
+}
+
+button {
+    padding: 9px 16px;
+    border: 1px solid var(--primary);
+    border-radius: 7px;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+button:hover:not(:disabled) {
+    border-color: var(--primary-dark);
+    background: var(--primary-dark);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+button:disabled {
+    border-color: #9ba4aa;
+    background: #aeb6bb;
+    color: #fff;
+    cursor: not-allowed;
+}
+
+/* 頁首與目前操作人 */
+body > header,
+main > section[data-panel] > header {
+    background: var(--surface);
+}
+
+body > header {
+    padding: 22px max(24px, calc((100% - var(--content-width)) / 2));
+    border-bottom: 1px solid var(--border);
+}
+
+body > header h1 {
+    margin: 0 0 12px;
+    font-size: clamp(24px, 3vw, 32px);
+    line-height: 1.35;
+    letter-spacing: 0.03em;
+}
+
+body > header label {
+    margin-right: 8px;
+    font-weight: 700;
+}
+
+#current-operator {
+    min-width: 180px;
+}
+
+#sync-state,
+#app-status {
+    margin: 12px 0 0;
+    padding: 10px 14px;
+    border-left: 4px solid var(--primary);
+    border-radius: 5px;
+    background: var(--primary-soft);
+    color: #173f32;
+    font-weight: 600;
+}
+
+/* 主功能導覽 */
+nav {
+    display: flex;
+    gap: 8px;
+    padding: 10px max(24px, calc((100% - var(--content-width)) / 2));
+    overflow-x: auto;
+    background: #263238;
+    scrollbar-width: thin;
+}
+
+nav button {
+    flex: 0 0 auto;
+    border-color: transparent;
+    background: transparent;
+    color: #fff;
+}
+
+nav button:hover:not(:disabled) {
+    border-color: rgb(255 255 255 / 25%);
+    background: rgb(255 255 255 / 12%);
+}
+
+nav button[aria-current="page"] {
+    border-color: #fff;
+    background: #fff;
+    color: var(--primary-dark);
+}
+
+/* 主內容與頁面區塊 */
+main {
+    width: min(var(--content-width), calc(100% - 48px));
+    margin: 24px auto 48px;
+}
+
+main > section[data-panel] {
+    display: block;
+}
+
+main > section[data-panel][hidden] {
+    display: none;
+}
+
+main > section[data-panel] > header {
+    margin-bottom: 20px;
+    padding: 22px 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+main > section[data-panel] > header h2 {
+    margin: 0 0 4px;
+    font-size: 25px;
+    line-height: 1.4;
+}
+
+main > section[data-panel] > header p {
+    margin: 4px 0 0;
+    color: var(--text-muted);
+}
+
+main section section {
+    margin-bottom: 20px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+main section section h3 {
+    margin: 0 0 14px;
+    font-size: 20px;
+    line-height: 1.45;
+}
+
+main section section h4 {
+    margin: 20px 0 8px;
+    font-size: 17px;
+}
+
+/* 首頁常用作業 */
+#quick-title {
+    margin-bottom: 12px;
+}
+
+[data-open-tab] {
+    margin: 0 8px 8px 0;
+}
+
+/* 表格與庫存明細 */
+table {
+    width: 100%;
+    margin: 10px 0 22px;
+    border-collapse: collapse;
+    background: var(--surface);
+    font-size: 15px;
+}
+
+caption {
+    padding: 8px 0;
+    color: var(--text);
+    font-weight: 700;
+    text-align: left;
+}
+
+th,
+td {
+    padding: 12px;
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+}
+
+th {
+    background: #e9eef1;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+tbody tr:nth-child(even) {
+    background: var(--surface-muted);
+}
+
+tbody tr:hover {
+    background: #edf4f1;
+}
+
+td button {
+    min-height: 40px;
+    padding: 7px 12px;
+}
+
+#warehouse1-summary,
+#warehouse2-summary {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+/* 提醒表格：依提醒類型提供不同底色 */
+#expiry-alert-table tr {
+    background: var(--warning-soft);
+}
+
+#aging-alert-table tr {
+    background: #fff8e9;
+}
+
+#safety-alert-table tr {
+    background: var(--danger-soft);
+}
+
+#expiry-alert-table td:last-child,
+#aging-alert-table td:last-child {
+    color: var(--warning);
+    font-weight: 700;
+}
+
+#safety-alert-table td:last-child {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+/* 進貨、出貨表單 */
+#inbound-form,
+#outbound-form {
+    margin-bottom: 20px;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+form p {
+    display: grid;
+    grid-template-columns: var(--form-label-width) minmax(220px, 460px);
+    align-items: center;
+    gap: 8px 16px;
+    margin: 14px 0;
+}
+
+form p label,
+form > label {
+    font-weight: 700;
+}
+
+form p label {
+    text-align: right;
+}
+
+form p input,
+form p select {
+    width: 100%;
+}
+
+#inbound-form > button,
+#outbound-form > button {
+    margin: 4px 0 0 2px calc(var(--form-label-width) + 16px);
+}
+
+/* 管理設定：將標籤與欄位排成清楚的兩欄 */
+#management > form {
+    display: grid;
+    grid-template-columns: var(--form-label-width) minmax(220px, 460px);
+    align-items: center;
+    gap: 12px 16px;
+    margin: 0 0 20px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+#management > form h3 {
+    grid-column: 1 / -1;
+    margin: 0 0 4px;
+    font-size: 19px;
+}
+
+#management > form label {
+    justify-self: end;
+    font-weight: 700;
+}
+
+#management > form input,
+#management > form select {
+    width: 100%;
+}
+
+#management > form button {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 4px;
+}
+
+/* 盤點搜尋列 */
+#count-warehouse,
+#count-search {
+    margin: 0 12px 12px 6px;
+}
+
+#count-search {
+    width: min(360px, 100%);
+}
+
+#count-table input {
+    width: 100px;
+}
+
+#count-table select {
+    min-width: 140px;
+}
+
+#count-table button {
+    white-space: nowrap;
+}
+
+/* FIFO 指引、同步提示與作業進度 */
+#pick-plan-table tbody tr:first-child {
+    background: var(--success-soft);
+}
+
+#pick-next-instruction {
+    margin: 16px 0;
+    padding: 14px 16px;
+    border-left: 5px solid var(--success);
+    border-radius: 6px;
+    background: var(--success-soft);
+    color: #164b32;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+#outbound-progress,
+#inbound-progress,
+#stocktake-progress {
+    padding: 12px 16px;
+    border-radius: 7px;
+    background: var(--surface-muted);
+    font-weight: 700;
+}
+
+#inbound-scan-title,
+#outbound-scan-title {
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+}
+
+#inbound-crate-codes,
+#outbound-scanned-list {
+    padding-left: 26px;
+}
+
+#inbound-crate-codes li,
+#outbound-scanned-list li {
+    margin: 6px 0;
+    overflow-wrap: anywhere;
+}
+
+/* 頁尾；HTML 有 footer 時套用 */
+footer {
+    width: min(var(--content-width), calc(100% - 48px));
+    margin: 0 auto 32px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* 較窄螢幕 */
+@media (max-width: 768px) {
+    body {
+        font-size: 16px;
+    }
+
+    body > header {
+        padding: 18px 16px;
+    }
+
+    body > header h1 {
+        font-size: 24px;
+    }
+
+    nav {
+        padding: 10px 12px;
+    }
+
+    nav button {
+        min-height: 48px;
+    }
+
+    main {
+        width: calc(100% - 24px);
+        margin: 14px auto 32px;
+    }
+
+    main > section[data-panel] > header {
+        padding: 18px;
+    }
+
+    main section section {
+        padding: 16px;
+    }
+
+    table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    form p {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+
+    form p label {
+        text-align: left;
+    }
+
+    #inbound-form > button,
+    #outbound-form > button {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    #management > form {
+        grid-template-columns: 1fr;
+        gap: 7px;
+        padding: 16px;
+    }
+
+    #management > form h3,
+    #management > form button {
+        grid-column: 1;
+    }
+
+    #management > form label {
+        justify-self: start;
+        margin-top: 5px;
+    }
+
+    #management > form button {
+        width: 100%;
+    }
+
+    #count-warehouse,
+    #count-search {
+        margin: 4px 0 10px;
+    }
+
+    #count-search {
+        width: 100%;
+    }
+
+    [data-open-tab] {
+        width: 100%;
+        margin-right: 0;
+    }
+}
