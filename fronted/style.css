@@ -1,160 +1,179 @@
-/* ================================
-   竹南冷凍倉儲管理系統
-   Frontend UI - 第 3 組
-   ================================ */
+/*
+ * 竹南冷凍倉儲管理系統｜第三版前端樣式
+ */
 
 * {
     box-sizing: border-box;
 }
 
 :root {
-    --bg: #f3f5f7;
+    --page-bg: #f3f5f7;
     --surface: #ffffff;
-    --surface-soft: #f8fafb;
-    --text: #1f2933;
-    --text-light: #667085;
-    --border: #d9dee5;
+    --surface-muted: #f7f9fa;
+    --text: #202a32;
+    --text-muted: #596773;
+    --border: #cbd3da;
     --primary: #245c4a;
     --primary-dark: #194538;
-    --primary-light: #e8f2ee;
-    --warning: #b7791f;
-    --warning-light: #fff6df;
-    --danger: #b42318;
-    --danger-light: #fff0ee;
-    --success: #18794e;
-    --success-light: #eaf7f0;
-    --radius: 12px;
-    --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    --primary-soft: #e8f2ee;
+    --warning: #805600;
+    --warning-soft: #fff4d6;
+    --danger: #9f2118;
+    --danger-soft: #ffebe8;
+    --success: #17623f;
+    --success-soft: #e8f4ed;
+    --radius: 10px;
+    --shadow: 0 2px 8px rgb(24 39 48 / 7%);
+    --content-width: 1400px;
+    --form-label-width: 160px;
+}
+
+html {
+    color-scheme: light;
+    scroll-behavior: smooth;
 }
 
 body {
+    min-width: 320px;
     margin: 0;
-    background: var(--bg);
+    background: var(--page-bg);
     color: var(--text);
-    font-family:
-        "Noto Sans TC",
-        "Microsoft JhengHei",
-        Arial,
-        sans-serif;
-    line-height: 1.6;
+    font-family: "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
 }
 
-/* ================================
-   Header
-   ================================ */
+button,
+input,
+select {
+    font: inherit;
+}
 
+button,
+input,
+select {
+    min-height: 46px;
+}
+
+input,
+select {
+    max-width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #9daab4;
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--text);
+}
+
+input::placeholder {
+    color: #687580;
+    opacity: 1;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+    outline: 3px solid #267a60;
+    outline-offset: 3px;
+}
+
+button {
+    padding: 9px 16px;
+    border: 1px solid var(--primary);
+    border-radius: 7px;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+button:hover:not(:disabled) {
+    border-color: var(--primary-dark);
+    background: var(--primary-dark);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+button:disabled {
+    border-color: #9ba4aa;
+    background: #aeb6bb;
+    color: #fff;
+    cursor: not-allowed;
+}
+
+/* 頁首與目前操作人 */
 body > header,
-main > section > header {
+main > section[data-panel] > header {
     background: var(--surface);
 }
 
 body > header {
-    padding: 22px 32px;
+    padding: 22px max(24px, calc((100% - var(--content-width)) / 2));
     border-bottom: 1px solid var(--border);
 }
 
 body > header h1 {
     margin: 0 0 12px;
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: 1px;
+    font-size: clamp(24px, 3vw, 32px);
+    line-height: 1.35;
+    letter-spacing: 0.03em;
 }
 
 body > header label {
-    font-weight: 600;
     margin-right: 8px;
+    font-weight: 700;
 }
 
-/* ================================
-   Form controls
-   ================================ */
-
-input,
-select,
-button {
-    font: inherit;
+#current-operator {
+    min-width: 180px;
 }
 
-input,
-select {
-    min-height: 42px;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: #fff;
-    color: var(--text);
-}
-
-input:focus,
-select:focus,
-button:focus-visible {
-    outline: 3px solid rgba(36, 92, 74, 0.2);
-    outline-offset: 2px;
-}
-
-button {
-    min-height: 42px;
-    padding: 8px 16px;
-    border: 0;
-    border-radius: 8px;
-    background: var(--primary);
-    color: #fff;
+#sync-state,
+#app-status {
+    margin: 12px 0 0;
+    padding: 10px 14px;
+    border-left: 4px solid var(--primary);
+    border-radius: 5px;
+    background: var(--primary-soft);
+    color: #173f32;
     font-weight: 600;
-    cursor: pointer;
-    transition:
-        background 0.15s ease,
-        transform 0.1s ease;
 }
 
-button:hover {
-    background: var(--primary-dark);
-}
-
-button:active {
-    transform: translateY(1px);
-}
-
-button:disabled {
-    background: #b8bec5;
-    cursor: not-allowed;
-    transform: none;
-}
-
-/* ================================
-   Navigation
-   ================================ */
-
+/* 主功能導覽 */
 nav {
     display: flex;
     gap: 8px;
-    padding: 12px 32px;
-    background: #263238;
+    padding: 10px max(24px, calc((100% - var(--content-width)) / 2));
     overflow-x: auto;
+    background: #263238;
+    scrollbar-width: thin;
 }
 
 nav button {
     flex: 0 0 auto;
+    border-color: transparent;
     background: transparent;
-    color: #ffffff;
-    border-radius: 8px;
-    padding: 10px 18px;
+    color: #fff;
 }
 
-nav button:hover {
-    background: rgba(255, 255, 255, 0.12);
+nav button:hover:not(:disabled) {
+    border-color: rgb(255 255 255 / 25%);
+    background: rgb(255 255 255 / 12%);
 }
 
 nav button[aria-current="page"] {
-    background: #ffffff;
+    border-color: #fff;
+    background: #fff;
     color: var(--primary-dark);
 }
 
-/* ================================
-   Main layout
-   ================================ */
-
+/* 主內容與頁面區塊 */
 main {
-    width: min(1400px, calc(100% - 48px));
+    width: min(var(--content-width), calc(100% - 48px));
     margin: 24px auto 48px;
 }
 
@@ -166,146 +185,154 @@ main > section[data-panel][hidden] {
     display: none;
 }
 
-main > section > header {
-    padding: 24px;
+main > section[data-panel] > header {
     margin-bottom: 20px;
+    padding: 22px 24px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
 }
 
-main > section > header h2 {
+main > section[data-panel] > header h2 {
     margin: 0 0 4px;
-    font-size: 24px;
+    font-size: 25px;
+    line-height: 1.4;
 }
 
-main > section > header p {
-    margin: 0;
-    color: var(--text-light);
+main > section[data-panel] > header p {
+    margin: 4px 0 0;
+    color: var(--text-muted);
 }
-
-/* ================================
-   Section cards
-   ================================ */
 
 main section section {
-    background: var(--surface);
+    margin-bottom: 20px;
+    padding: 20px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 20px;
-    margin-bottom: 20px;
+    background: var(--surface);
     box-shadow: var(--shadow);
 }
 
 main section section h3 {
-    margin-top: 0;
-    margin-bottom: 16px;
-    font-size: 19px;
+    margin: 0 0 14px;
+    font-size: 20px;
+    line-height: 1.45;
 }
 
 main section section h4 {
-    margin-bottom: 10px;
+    margin: 20px 0 8px;
+    font-size: 17px;
 }
 
-/* ================================
-   Quick actions
-   ================================ */
-
+/* 首頁常用作業 */
 #quick-title {
     margin-bottom: 12px;
 }
 
-#quick-title + button,
-#quick-title + button + button,
-#quick-title + button + button + button {
-    margin-right: 8px;
-    margin-bottom: 8px;
+[data-open-tab] {
+    margin: 0 8px 8px 0;
 }
 
-/* ================================
-   Tables
-   ================================ */
-
+/* 表格與庫存明細 */
 table {
     width: 100%;
+    margin: 10px 0 22px;
     border-collapse: collapse;
-    margin: 12px 0 24px;
     background: var(--surface);
-    font-size: 14px;
+    font-size: 15px;
 }
 
 caption {
-    text-align: left;
     padding: 8px 0;
-    font-weight: 700;
     color: var(--text);
+    font-weight: 700;
+    text-align: left;
 }
 
 th,
 td {
-    padding: 11px 12px;
-    border-bottom: 1px solid var(--border);
+    padding: 12px;
+    border: 1px solid var(--border);
     text-align: left;
     vertical-align: middle;
 }
 
 th {
-    background: #eef1f3;
+    background: #e9eef1;
     font-weight: 700;
     white-space: nowrap;
 }
 
-tbody tr:hover {
-    background: var(--surface-soft);
+tbody tr:nth-child(even) {
+    background: var(--surface-muted);
 }
 
-/* ================================
-   Warehouse summary
-   ================================ */
+tbody tr:hover {
+    background: #edf4f1;
+}
+
+td button {
+    min-height: 40px;
+    padding: 7px 12px;
+}
 
 #warehouse1-summary,
 #warehouse2-summary {
     display: inline-block;
     margin-left: 8px;
-    padding: 3px 9px;
+    padding: 3px 10px;
     border-radius: 999px;
-    background: var(--primary-light);
+    background: var(--primary-soft);
     color: var(--primary-dark);
-    font-size: 13px;
-    font-weight: 600;
-}
-
-/* ================================
-   Alerts
-   ================================ */
-
-#expiry-alert-table tr,
-#aging-alert-table tr,
-#safety-alert-table tr {
-    background: var(--warning-light);
-}
-
-#expiry-alert-table td:last-child,
-#aging-alert-table td:last-child,
-#safety-alert-table td:last-child {
+    font-size: 14px;
     font-weight: 700;
 }
 
-/* ================================
-   Forms
-   ================================ */
+/* 提醒表格：依提醒類型提供不同底色 */
+#expiry-alert-table tr {
+    background: var(--warning-soft);
+}
 
-form {
+#aging-alert-table tr {
+    background: #fff8e9;
+}
+
+#safety-alert-table tr {
+    background: var(--danger-soft);
+}
+
+#expiry-alert-table td:last-child,
+#aging-alert-table td:last-child {
+    color: var(--warning);
+    font-weight: 700;
+}
+
+#safety-alert-table td:last-child {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+/* 進貨、出貨表單 */
+#inbound-form,
+#outbound-form {
+    margin-bottom: 20px;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--surface);
 }
 
 form p {
     display: grid;
-    grid-template-columns: 140px minmax(240px, 420px);
+    grid-template-columns: var(--form-label-width) minmax(220px, 460px);
     align-items: center;
-    gap: 10px 16px;
-    margin: 16px 0;
-    padding-left: 20px;
+    gap: 8px 16px;
+    margin: 14px 0;
+}
+
+form p label,
+form > label {
+    font-weight: 700;
 }
 
 form p label {
@@ -315,37 +342,84 @@ form p label {
 form p input,
 form p select {
     width: 100%;
-    max-width: 420px;
 }
 
-form label {
-    font-weight: 600;
+#inbound-form > button,
+#outbound-form > button {
+    margin: 4px 0 0 2px calc(var(--form-label-width) + 16px);
 }
 
-form input,
-form select {
-    max-width: 420px;
+/* 管理設定：將標籤與欄位排成清楚的兩欄 */
+#management > form {
+    display: grid;
+    grid-template-columns: var(--form-label-width) minmax(220px, 460px);
+    align-items: center;
+    gap: 12px 16px;
+    margin: 0 0 20px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
 }
 
-form button {
-    margin-top: 6px;
+#management > form h3 {
+    grid-column: 1 / -1;
+    margin: 0 0 4px;
+    font-size: 19px;
 }
 
-/* ================================
-   FIFO
-   ================================ */
+#management > form label {
+    justify-self: end;
+    font-weight: 700;
+}
 
+#management > form input,
+#management > form select {
+    width: 100%;
+}
+
+#management > form button {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 4px;
+}
+
+/* 盤點搜尋列 */
+#count-warehouse,
+#count-search {
+    margin: 0 12px 12px 6px;
+}
+
+#count-search {
+    width: min(360px, 100%);
+}
+
+#count-table input {
+    width: 100px;
+}
+
+#count-table select {
+    min-width: 140px;
+}
+
+#count-table button {
+    white-space: nowrap;
+}
+
+/* FIFO 指引、同步提示與作業進度 */
 #pick-plan-table tbody tr:first-child {
-    background: var(--success-light);
+    background: var(--success-soft);
 }
 
 #pick-next-instruction {
     margin: 16px 0;
-    padding: 16px;
+    padding: 14px 16px;
     border-left: 5px solid var(--success);
-    border-radius: 8px;
-    background: var(--success-light);
-    font-size: 17px;
+    border-radius: 6px;
+    background: var(--success-soft);
+    color: #164b32;
+    font-size: 18px;
     font-weight: 700;
 }
 
@@ -353,96 +427,66 @@ form button {
 #inbound-progress,
 #stocktake-progress {
     padding: 12px 16px;
-    border-radius: 8px;
-    background: var(--surface-soft);
-    font-weight: 600;
+    border-radius: 7px;
+    background: var(--surface-muted);
+    font-weight: 700;
 }
-
-/* ================================
-   Scan areas
-   ================================ */
 
 #inbound-scan-title,
 #outbound-scan-title {
-    border-bottom: 2px solid var(--border);
     padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
 }
 
 #inbound-crate-codes,
 #outbound-scanned-list {
-    padding-left: 24px;
+    padding-left: 26px;
 }
 
 #inbound-crate-codes li,
 #outbound-scanned-list li {
-    margin: 5px 0;
+    margin: 6px 0;
+    overflow-wrap: anywhere;
 }
 
-/* ================================
-   Stocktake
-   ================================ */
-
-#count-table input {
-    width: 90px;
-}
-
-#count-table select {
-    min-width: 120px;
-}
-
-#count-table button {
-    white-space: nowrap;
-}
-
-/* ================================
-   Management
-   ================================ */
-
-#management > form {
-    padding: 20px;
-    margin-bottom: 20px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-}
-
-#management h3 {
-    margin-top: 0;
-}
-
-/* ================================
-   Footer
-   ================================ */
-
+/* 頁尾；HTML 有 footer 時套用 */
 footer {
-    width: min(1400px, calc(100% - 48px));
+    width: min(var(--content-width), calc(100% - 48px));
     margin: 0 auto 32px;
-    color: var(--text-light);
-    font-size: 13px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 14px;
 }
 
-/* ================================
-   Mobile
-   ================================ */
-
+/* 較窄螢幕 */
 @media (max-width: 768px) {
+    body {
+        font-size: 16px;
+    }
+
     body > header {
-        padding: 18px;
+        padding: 18px 16px;
     }
 
     body > header h1 {
-        font-size: 22px;
+        font-size: 24px;
     }
 
     nav {
         padding: 10px 12px;
     }
 
-    main {
-        width: calc(100% - 24px);
-        margin-top: 12px;
+    nav button {
+        min-height: 48px;
     }
 
-    main > section > header {
+    main {
+        width: calc(100% - 24px);
+        margin: 14px auto 32px;
+    }
+
+    main > section[data-panel] > header {
         padding: 18px;
     }
 
@@ -452,39 +496,71 @@ footer {
 
     table {
         display: block;
+        max-width: 100%;
         overflow-x: auto;
         white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
     }
 
     form p {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 6px;
-        padding-left: 0;
+        grid-template-columns: 1fr;
+        gap: 5px;
     }
 
     form p label {
         text-align: left;
     }
 
-    form p input,
-    form p select {
+    #inbound-form > button,
+    #outbound-form > button {
         width: 100%;
-        max-width: none;
+        margin-left: 0;
     }
 
-    form input,
-    form select,
-    form button {
-        width: 100%;
-        max-width: none;
+    #management > form {
+        grid-template-columns: 1fr;
+        gap: 7px;
+        padding: 16px;
     }
 
-    #quick-title + button,
-    #quick-title + button + button,
-    #quick-title + button + button + button {
+    #management > form h3,
+    #management > form button {
+        grid-column: 1;
+    }
+
+    #management > form label {
+        justify-self: start;
+        margin-top: 5px;
+    }
+
+    #management > form button {
+        width: 100%;
+    }
+
+    #count-warehouse,
+    #count-search {
+        margin: 4px 0 10px;
+    }
+
+    #count-search {
+        width: 100%;
+    }
+
+    [data-open-tab] {
         width: 100%;
         margin-right: 0;
+    }
+
+    footer {
+        width: calc(100% - 24px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
     }
 }

@@ -1,18 +1,21 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
+    <!-- 第三版：[CORE MUST] 對應老師 1.0／2.0 與維護 NO1–NO3；[V3 ADD] 為前端流程改善；[BACKEND CONNECTED] 表示已串接第二組 API；此檔不含 CSS。 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="竹南冷凍倉儲管理系統">
     <title>竹南冷凍倉儲管理系統</title>
     <link rel="stylesheet" href="style.css">
     <script src="app.js" defer></script>
+
 </head>
 <body>
     <header>
         <h1>竹南冷凍倉儲管理系統</h1>
         <label for="current-operator">目前操作人</label>
         <select id="current-operator" required></select>
+        <p id="sync-state" role="status">正在連線後端 API…</p>
     </header>
 
     <nav aria-label="主要功能">
@@ -24,12 +27,13 @@
     </nav>
 
     <main>
+        <!-- [CORE MUST｜雙倉庫狀況] 延續原版雙倉庫總覽，呈現異動後的庫存。 -->
         <section id="dashboard" data-panel aria-labelledby="dashboard-title">
             <header>
                 <h2 id="dashboard-title">庫存總覽</h2>
                 <p>資料更新時間：<time id="last-updated"></time></p>
             </header>
-            <!-- 讓操作人從首頁直接進入主要工作，降低找錯頁或忘記登記的機會。 -->
+            <!-- [V3 ADD｜簡便入口] 讓操作人從首頁直接進入主要工作，降低找錯頁或忘記登記的機會。 -->
             <section aria-labelledby="quick-title">
                 <h3 id="quick-title">常用作業</h3>
                 <button type="button" data-open-tab="inbound">登記進貨</button>
@@ -51,7 +55,7 @@
                     <tbody id="warehouse2-table"></tbody>
                 </table>
             </section>
-            <!-- 效期、久放及安全庫存提醒 -->
+            <!-- [OPTIONAL｜加分] 效期、久放及安全庫存提醒；不取代每日實際盤點。 -->
             <section aria-labelledby="alerts-title">
                 <h3 id="alerts-title">需要留意的庫存</h3>
                 <h4>效期提醒</h4>
@@ -61,22 +65,22 @@
                 <h4>低庫存提醒</h4>
                 <table><caption>低於安全庫存的商品</caption><thead><tr><th scope="col">商品</th><th scope="col">倉庫</th><th scope="col">現有量</th><th scope="col">安全量</th></tr></thead><tbody id="safety-alert-table"></tbody></table>
             </section>
-            <!-- 統計報廢原因，幫助管理者了解損耗來源 -->
+            <!-- [OPTIONAL｜加分] 統計報廢原因，幫助管理者了解損耗來源；報廢登記本身仍是必要流程。 -->
             <section aria-labelledby="waste-summary-title">
                 <h3 id="waste-summary-title">報廢原因統計</h3>
                 <table><caption>累計報廢數量</caption><thead><tr><th scope="col">原因</th><th scope="col">數量</th></tr></thead><tbody id="waste-table"></tbody></table>
             </section>
-            <!-- 原版近期紀錄保留。 -->
+            <!-- [CORE MUST｜異動可追查] 原版近期紀錄保留；第三版記錄操作人、位置與批次。 -->
             <section aria-labelledby="activity-title">
                 <h3 id="activity-title">近期異動紀錄</h3>
                 <table><caption>進貨、出貨、盤點與報廢紀錄</caption><thead><tr><th scope="col">時間</th><th scope="col">作業</th><th scope="col">商品／位置</th><th scope="col">數量</th><th scope="col">原因</th><th scope="col">操作人</th></tr></thead><tbody id="activity-table"></tbody></table>
             </section>
         </section>
 
-        <!-- 入庫須在實際點收與儲位確認後完成。掃碼用文字代碼模擬，實機條碼掃描器可輸入相同代碼。 -->
+        <!-- [CORE MUST｜進貨時間] 入庫須在實際點收與儲位確認後完成。掃碼用文字代碼模擬，實機條碼掃描器可輸入相同代碼。 -->
         <section id="inbound" data-panel aria-labelledby="inbound-title" hidden>
-            <header><h2 id="inbound-title">進貨入庫</h2><p>先建立收貨資料，再核對儲位並逐箱登記；完成前不增加庫存。</p></header>
-            <!-- [BACKEND MUST｜中：1–3 人日] 正式版需以 API 建立收貨工作、由伺服器記錄入庫時間，並產生／列印每箱標籤；庫存只在掃描確認成功後入帳。 -->
+            <header><h2 id="inbound-title">進貨入庫</h2></header>
+            <!-- [BACKEND CONNECTED] 使用 /api/inbound-tasks；伺服器建立批號與箱號，確認入庫時記錄時間並更新庫存。 -->
             <form id="inbound-form">
                 <p><label for="in-item">商品名稱</label><input id="in-item" name="item" list="product-options" maxlength="80" required><datalist id="product-options"></datalist></p>
                 <p><label for="in-warehouse">存放倉庫</label><select id="in-warehouse" name="warehouse"><option value="1">倉庫 1</option><option value="2">倉庫 2</option></select></p>
@@ -87,7 +91,6 @@
             </form>
             <section aria-labelledby="inbound-scan-title">
                 <h3 id="inbound-scan-title">入庫核對</h3>
-                <p>展示時可手動輸入代碼；實際 PDA 條碼掃描器會將掃描結果輸入欄位。</p>
                 <p>本次批號：<output id="inbound-lot">尚未建立</output></p>
                 <p>儲位代碼：<output id="inbound-location-code">—</output></p>
                 <p><label for="in-scan-location">掃描儲位代碼</label><input id="in-scan-location" autocomplete="off"></p>
@@ -104,22 +107,22 @@
         <!-- [CORE MUST｜NO3 FIFO] 系統找出最早批次及位置；確認前逐箱核對，完成後扣除同批庫存。 -->
         <section id="outbound" data-panel aria-labelledby="outbound-title" hidden>
             <header><h2 id="outbound-title">出貨取貨</h2><p>建立取貨工作後，依畫面指示掃描儲位及每一箱蔬果。</p></header>
-            <!-- [BACKEND MUST｜大：3–5+ 人日] 出貨需求與 FIFO 批次須由後端原子保留；庫存不足、重複掃描或批次不符時拒絕出庫並記錄交易。 -->
+            <!-- [BACKEND CONNECTED] 使用 /api/pick-tasks；FIFO、儲位核對、逐箱掃描與確認扣庫由伺服器處理。 -->
             <form id="outbound-form">
                 <p><label for="out-item">商品</label><select id="out-item" name="item" required><option value="">請選擇商品</option></select></p>
                 <p><label for="out-quantity">出貨箱數</label><input id="out-quantity" name="quantity" type="number" min="1" step="1" required></p>
-                <button type="submit">建立 FIFO 取貨工作</button>
+                <button type="submit">建立取貨工作</button>
             </form>
             <section aria-labelledby="pick-plan-title">
-                <h3 id="pick-plan-title">FIFO 取貨順序</h3>
+                <h3 id="pick-plan-title">取貨順序</h3>
                 <table><caption>由最早入庫批次開始</caption><thead><tr><th scope="col">順序</th><th scope="col">倉庫／儲位</th><th scope="col">批號／入庫時間</th><th scope="col">需取箱數</th><th scope="col">已掃箱數</th></tr></thead><tbody id="pick-plan-table"></tbody></table>
                 <p id="pick-next-instruction" role="status">尚未建立取貨工作。</p>
             </section>
             <section aria-labelledby="outbound-scan-title">
                 <h3 id="outbound-scan-title">取貨掃描確認</h3>
-                <p><label for="out-scan-location">掃描目前儲位代碼</label><input id="out-scan-location" autocomplete="off"></p>
+                <p><label for="out-scan-location">輸入或掃描目前儲位代碼</label><input id="out-scan-location" autocomplete="off"></p>
                 <button id="out-verify-location" type="button" disabled>核對儲位</button>
-                <p><label for="out-scan-crate">掃描實際取出的箱條碼</label><input id="out-scan-crate" autocomplete="off"></p>
+                <p><label for="out-scan-crate">輸入或掃描實際取出的箱條碼</label><input id="out-scan-crate" autocomplete="off"></p>
                 <button id="out-scan-crate-button" type="button" disabled>登記取出此箱</button>
                 <p id="outbound-progress" role="status">請先建立取貨工作。</p>
                 <ul id="outbound-scanned-list"></ul>
@@ -130,8 +133,8 @@
 
         <!-- [CORE MUST｜NO2 每日盤點] 逐儲位核對實際數量、記錄差異原因並顯示今日完成進度。 -->
         <section id="stocktake" data-panel aria-labelledby="stocktake-title" hidden>
-            <header><h2 id="stocktake-title">每日盤點</h2><p>建議每天完成一次。逐筆核對現場箱數；腐爛或短少請選擇原因。</p></header>
-            <!-- [BACKEND MUST] 每日盤點結果需保存日期、儲位、盤點人、盤點前後數量及原因；支援進度與未完成清單。 -->
+            <header><h2 id="stocktake-title">每日盤點</h2></header>
+            <!-- [BACKEND CONNECTED] 使用 /api/stocktake 與 /api/stocktake/counts 保存盤點進度、差異原因及操作人。 -->
             <p>盤點日期：<time id="stocktake-date"></time></p>
             <p id="stocktake-progress" role="status"></p>
             <label for="count-warehouse">倉庫</label><select id="count-warehouse"><option value="all">全部倉庫</option><option value="1">倉庫 1</option><option value="2">倉庫 2</option></select>
@@ -139,9 +142,9 @@
             <table><caption>今日盤點清單</caption><thead><tr><th scope="col">狀態</th><th scope="col">倉庫／儲位</th><th scope="col">商品／批號</th><th scope="col">系統數量</th><th scope="col">實際數量</th><th scope="col">差異原因</th><th scope="col">操作</th></tr></thead><tbody id="count-table"></tbody></table>
         </section>
 
-        <!-- [BACKEND] 正式版須保存安全水位、久放門檻並提供共用查詢；報廢統計可由異動 API 彙總。 -->
+        <!-- [BACKEND CONNECTED] 安全庫存、久放門檻及報廢統計使用管理 API。 -->
         <section id="management" data-panel aria-labelledby="management-title" hidden>
-            <header><h2 id="management-title">管理設定</h2><p>以下是管理加分項目，可依專案時間完成。</p></header>
+            <header><h2 id="management-title">管理設定</h2></header>
             <form id="safety-form">
                 <h3>安全庫存</h3>
                 <label for="safety-item">商品</label><input id="safety-item" list="product-options" required>
@@ -155,7 +158,7 @@
                 <label for="aging-days">存放幾天後提醒</label><input id="aging-days" type="number" min="1" step="1" required>
                 <button type="submit">儲存提醒天數</button>
             </form>
-            <!-- [BACKEND OPTIONAL] 若採用正式帳號管理，需登入驗證及伺服器端角色權限；本頁人員名單僅供展示。 -->
+            <!-- [BACKEND OPTIONAL｜大：3–5+ 人日] 若採用正式帳號管理，需登入驗證及伺服器端角色權限；本頁人員名單僅供展示。 -->
             <form id="user-form">
                 <h3>人員名單</h3>
                 <label for="user-name">姓名</label><input id="user-name" maxlength="60" required>
@@ -165,8 +168,5 @@
             <table><caption>人員名單</caption><thead><tr><th scope="col">姓名</th><th scope="col">角色</th></tr></thead><tbody id="user-table"></tbody></table>
         </section>
     </main>
-    <footer>
-        <!-- [BACKEND MUST｜NO1] 正式版須連共用資料庫；若員工可能繞過登記，須整合銷售流程或現場掃碼。僅有前端確認鈕無法偵測未登記的實體搬運。 -->
-    </footer>
 </body>
 </html>
