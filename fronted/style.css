@@ -550,17 +550,4 @@ footer {
         width: 100%;
         margin-right: 0;
     }
-
-    footer {
-        width: calc(100% - 24px);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        scroll-behavior: auto !important;
-        transition-duration: 0.01ms !important;
-    }
 }
