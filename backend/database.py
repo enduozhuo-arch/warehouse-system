@@ -26,6 +26,20 @@ def initialize_database():
         connection.close()
 
 
-if __name__ == "__main__":
+def reset_database():
+    # 刪除現有資料庫並由 schema.sql 重建（會清掉目前的資料）
+    if DATABASE_PATH.exists():
+        DATABASE_PATH.unlink()
+
     initialize_database()
-    print("Database initialized successfully.")
+
+
+if __name__ == "__main__":
+    import sys
+
+    if "--reset" in sys.argv:
+        reset_database()
+        print("Database reset successfully.")
+    else:
+        initialize_database()
+        print("Database initialized successfully.")
