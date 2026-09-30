@@ -3,235 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="竹南冷凍倉儲系統">
-    <title>竹南冷凍倉儲系統</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="竹南冷凍倉儲管理系統">
+    <title>竹南冷凍倉儲管理系統</title>
     <script src="app.js" defer></script>
 </head>
 <body>
+    <header>
+        <h1>竹南冷凍倉儲管理系統</h1>
+        <label for="current-operator">目前操作人</label>
+        <select id="current-operator" required></select>
+    </header>
 
-    <div>
-        <!-- 側邊欄導覽 -->
-        <aside aria-label="系統側邊欄">
-            <div>
-                <h1>竹南冷凍倉儲</h1>
-                <p>倉庫作業管理</p>
-            </div>
-            
-            <nav aria-label="主要導覽">
-                <button type="button" class="nav-button" data-tab="dashboard" aria-current="page">庫存總覽</button>
-                <button type="button" class="nav-button" data-tab="inbound">進貨登記</button>
-                <button type="button" class="nav-button" data-tab="outbound">出貨作業（先進先出）</button>
-                <button type="button" class="nav-button" data-tab="inventory">盤點與報廢</button>
-            </nav>
-        </aside>
+    <nav aria-label="主要功能">
+        <button type="button" data-tab="dashboard" aria-current="page">庫存總覽</button>
+        <button type="button" data-tab="inbound">進貨入庫</button>
+        <button type="button" data-tab="outbound">出貨取貨</button>
+        <button type="button" data-tab="stocktake">每日盤點</button>
+        <button type="button" data-tab="management">管理設定</button>
+    </nav>
 
-        <!-- 主要內容區 -->
-        <main>
-            <!-- 1. 庫存總覽頁面 -->
-            <section id="dashboard" class="tab-content" aria-labelledby="dashboard-title">
-                <header>
-                    <div>
-                        <h2 id="dashboard-title">庫存總覽</h2>
-                        <p>查看兩個倉庫的商品、數量和入庫時間</p>
-                    </div>
-                    <p>資料最後更新：<time id="last-updated"></time></p>
-                </header>
-
-                <div>
-                    <!-- 倉庫 1 -->
-                    <section aria-labelledby="warehouse1-title">
-                        <div>
-                            <h3 id="warehouse1-title">倉庫 1</h3>
-                            <span id="warehouse1-summary"></span>
-                        </div>
-                        <div>
-                            <table>
-                                <caption class="sr-only">倉庫 1 庫存明細</caption>
-                                <thead>
-                                    <tr>
-                                        <th scope="col">儲位</th>
-                                        <th scope="col">商品</th>
-                                        <th scope="col">數量</th>
-                                        <th scope="col">入庫時間</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="wh1-table"></tbody>
-                            </table>
-                        </div>
-                    </section>
-
-                    <!-- 倉庫 2 -->
-                    <section aria-labelledby="warehouse2-title">
-                        <div>
-                            <h3 id="warehouse2-title">倉庫 2</h3>
-                            <span id="warehouse2-summary"></span>
-                        </div>
-                        <div>
-                            <table>
-                                <caption class="sr-only">倉庫 2 庫存明細</caption>
-                                <thead>
-                                    <tr>
-                                        <th scope="col">儲位</th>
-                                        <th scope="col">商品</th>
-                                        <th scope="col">數量</th>
-                                        <th scope="col">入庫時間</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="wh2-table"></tbody>
-                            </table>
-                        </div>
-                    </section>
-                </div>
-
-                <!-- 近期庫存紀錄 -->
-                <section aria-labelledby="activity-title">
-                    <h3 id="activity-title">近期庫存紀錄</h3>
-                    <p>查看作業時間、商品數量與操作人</p>
-                    <div>
-                        <table>
-                            <caption class="sr-only">近期庫存紀錄</caption>
-                            <thead>
-                                <tr>
-                                    <th scope="col">時間</th>
-                                    <th scope="col">作業</th>
-                                    <th scope="col">品項／位置</th>
-                                    <th scope="col">數量</th>
-                                    <th scope="col">原因／操作人</th>
-                                </tr>
-                            </thead>
-                            <tbody id="activity-table"></tbody>
-                        </table>
-                    </div>
-                </section>
+    <main>
+        <section id="dashboard" data-panel aria-labelledby="dashboard-title">
+            <header>
+                <h2 id="dashboard-title">庫存總覽</h2>
+                <p>資料更新時間：<time id="last-updated"></time></p>
+            </header>
+            <!-- 讓操作人從首頁直接進入主要工作，降低找錯頁或忘記登記的機會。 -->
+            <section aria-labelledby="quick-title">
+                <h3 id="quick-title">常用作業</h3>
+                <button type="button" data-open-tab="inbound">登記進貨</button>
+                <button type="button" data-open-tab="outbound">建立出貨</button>
+                <button type="button" data-open-tab="stocktake">開始今日盤點</button>
             </section>
-
-            <!-- 2. 進貨登記頁面 -->
-            <section id="inbound" class="tab-content hidden" aria-labelledby="inbound-title" hidden>
-                <header>
-                    <h2 id="inbound-title">進貨登記</h2>
-                    <p>填寫商品、倉庫、儲位和數量。系統會記錄進貨時間，供出貨排序使用。</p>
-                </header>
-
-                <section aria-label="進貨表單">
-                    <form id="inbound-form">
-                        <div>
-                            <div>
-                                <label for="in-item">商品名稱</label>
-                                <select id="in-item" name="item" required>
-                                    <option value="甘藍菜">甘藍菜</option>
-                                    <option value="青江菜">青江菜</option>
-                                    <option value="高麗菜">高麗菜</option>
-                                    <option value="番茄">番茄</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="in-wh">存放倉庫</label>
-                                <select id="in-wh" name="warehouse" required>
-                                    <option value="1">倉庫 1</option>
-                                    <option value="2">倉庫 2</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="in-bin">儲位</label>
-                                <input id="in-bin" name="bin" type="text" placeholder="例如：A-01" maxlength="20" required>
-                            </div>
-                            <div>
-                                <label for="in-qty">進貨數量（箱）</label>
-                                <input id="in-qty" name="quantity" type="number" min="1" step="1" value="2" required>
-                            </div>
-                            <div>
-                                <label for="in-operator">操作人</label>
-                                <input id="in-operator" name="operator" type="text" value="" placeholder="請輸入姓名" maxlength="60" required>
-                            </div>
-                        </div>
-                        <p>系統會在確認進貨時自動記錄時間，作為先進先出的排序依據。</p>
-                        <button type="submit">確認進貨</button>
-                    </form>
-                </section>
+            <section aria-labelledby="stock-summary-title">
+                <h3 id="stock-summary-title">兩個倉庫的庫存</h3>
+                <h4>倉庫 1 <span id="warehouse1-summary"></span></h4>
+                <table>
+                    <caption>倉庫 1 庫存明細</caption>
+                    <thead><tr><th scope="col">儲位</th><th scope="col">商品</th><th scope="col">數量</th><th scope="col">批號</th><th scope="col">入庫時間</th><th scope="col">效期／提醒</th></tr></thead>
+                    <tbody id="warehouse1-table"></tbody>
+                </table>
+                <h4>倉庫 2 <span id="warehouse2-summary"></span></h4>
+                <table>
+                    <caption>倉庫 2 庫存明細</caption>
+                    <thead><tr><th scope="col">儲位</th><th scope="col">商品</th><th scope="col">數量</th><th scope="col">批號</th><th scope="col">入庫時間</th><th scope="col">效期／提醒</th></tr></thead>
+                    <tbody id="warehouse2-table"></tbody>
+                </table>
             </section>
-
-            <!-- 3. 出貨作業頁面 -->
-            <section id="outbound" class="tab-content hidden" aria-labelledby="outbound-title" hidden>
-                <header>
-                    <h2 id="outbound-title">出貨作業（先進先出）</h2>
-                    <p>先出貨較早進貨的商品。若數量不足，系統會接著從下一筆庫存扣除。</p>
-                </header>
-
-                <section aria-label="出貨表單">
-                    <form id="outbound-form">
-                        <div>
-                            <label for="out-item">請選擇出貨品項</label>
-                            <select id="out-item" name="item" required>
-                                <option value="">— 請選擇蔬菜 —</option>
-                            </select>
-                        </div>
-
-                        <div id="fifo-suggestion" aria-live="polite">
-                            <h3>建議先取用</h3>
-                            <p>入庫時間：<strong id="fifo-date"></strong></p>
-                            <p>倉庫 <strong id="fifo-wh"></strong>　儲位 <strong id="fifo-bin"></strong></p>
-                            <p>這筆庫存可用：<strong id="fifo-qty"></strong> 箱</p>
-                            <p id="fifo-allocation"></p>
-                        </div>
-
-                        <p id="no-stock-msg" role="status">目前沒有可出貨的庫存。</p>
-
-                        <div>
-                            <div>
-                                <label for="out-qty">出貨數量（箱）</label>
-                                <input id="out-qty" name="quantity" type="number" min="1" step="1" required>
-                            </div>
-                            <div>
-                                <label for="out-operator">操作人</label>
-                                <input id="out-operator" name="operator" type="text" value="" placeholder="請輸入姓名" maxlength="60" required>
-                            </div>
-                        </div>
-
-                        <button id="out-submit" type="submit">確認出貨並扣除庫存</button>
-                    </form>
-                </section>
+            <!-- 效期、久放及安全庫存提醒 -->
+            <section aria-labelledby="alerts-title">
+                <h3 id="alerts-title">需要留意的庫存</h3>
+                <h4>效期提醒</h4>
+                <table><caption>三天內到期或已過期批次</caption><thead><tr><th scope="col">商品</th><th scope="col">倉庫／儲位</th><th scope="col">批號</th><th scope="col">效期狀態</th></tr></thead><tbody id="expiry-alert-table"></tbody></table>
+                <h4>久放提醒</h4>
+                <table><caption>超過商品提醒天數的批次</caption><thead><tr><th scope="col">商品</th><th scope="col">倉庫／儲位</th><th scope="col">存放天數</th><th scope="col">提醒天數</th></tr></thead><tbody id="aging-alert-table"></tbody></table>
+                <h4>低庫存提醒</h4>
+                <table><caption>低於安全庫存的商品</caption><thead><tr><th scope="col">商品</th><th scope="col">倉庫</th><th scope="col">現有量</th><th scope="col">安全量</th></tr></thead><tbody id="safety-alert-table"></tbody></table>
             </section>
-
-            <!-- 4. 盤點與報廢頁面 -->
-            <section id="inventory" class="tab-content hidden" aria-labelledby="inventory-title" hidden>
-                <header>
-                    <h2 id="inventory-title">盤點與報廢</h2>
-                    <p>選擇倉庫與商品，核對實際數量。若有短少，請選擇原因並記錄。</p>
-                </header>
-
-                <section aria-label="盤點與報廢清單">
-                    <div>
-                        <label for="inv-wh-select">切換盤點倉庫</label>
-                        <select id="inv-wh-select">
-                            <option value="1">倉庫 1</option>
-                            <option value="2">倉庫 2</option>
-                        </select>
-                    </div>
-                    <div>
-                        <table>
-                            <caption class="sr-only">庫存盤點與報廢表</caption>
-                            <thead>
-                                <tr>
-                                    <th scope="col">儲位</th>
-                                    <th scope="col">商品</th>
-                                    <th scope="col">系統記錄數量</th>
-                                    <th scope="col">實際可用數量</th>
-                                    <th scope="col">差異／報廢原因</th>
-                                    <th scope="col">操作人</th>
-                                    <th scope="col">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="inv-table"></tbody>
-                        </table>
-                    </div>
-                </section>
+            <!-- 統計報廢原因，幫助管理者了解損耗來源 -->
+            <section aria-labelledby="waste-summary-title">
+                <h3 id="waste-summary-title">報廢原因統計</h3>
+                <table><caption>累計報廢數量</caption><thead><tr><th scope="col">原因</th><th scope="col">數量</th></tr></thead><tbody id="waste-table"></tbody></table>
             </section>
+            <!-- 原版近期紀錄保留。 -->
+            <section aria-labelledby="activity-title">
+                <h3 id="activity-title">近期異動紀錄</h3>
+                <table><caption>進貨、出貨、盤點與報廢紀錄</caption><thead><tr><th scope="col">時間</th><th scope="col">作業</th><th scope="col">商品／位置</th><th scope="col">數量</th><th scope="col">原因</th><th scope="col">操作人</th></tr></thead><tbody id="activity-table"></tbody></table>
+            </section>
+        </section>
 
-            <!-- 系統狀態提示 -->
-            <p id="app-status" role="status" aria-live="polite">請選擇上方作業項目開始。</p>
-        </main>
-    </div>
+        <!-- 入庫須在實際點收與儲位確認後完成。掃碼用文字代碼模擬，實機條碼掃描器可輸入相同代碼。 -->
+        <section id="inbound" data-panel aria-labelledby="inbound-title" hidden>
+            <header><h2 id="inbound-title">進貨入庫</h2><p>先建立收貨資料，再核對儲位並逐箱登記；完成前不增加庫存。</p></header>
+            <!-- [BACKEND MUST｜中：1–3 人日] 正式版需以 API 建立收貨工作、由伺服器記錄入庫時間，並產生／列印每箱標籤；庫存只在掃描確認成功後入帳。 -->
+            <form id="inbound-form">
+                <p><label for="in-item">商品名稱</label><input id="in-item" name="item" list="product-options" maxlength="80" required><datalist id="product-options"></datalist></p>
+                <p><label for="in-warehouse">存放倉庫</label><select id="in-warehouse" name="warehouse"><option value="1">倉庫 1</option><option value="2">倉庫 2</option></select></p>
+                <p><label for="in-bin">儲位</label><input id="in-bin" name="bin" maxlength="20" placeholder="例如 A-01" required></p>
+                <p><label for="in-quantity">預計入庫箱數</label><input id="in-quantity" name="quantity" type="number" min="1" step="1" value="2" required></p>
+                <p><label for="in-expiry">有效期限（選填）</label><input id="in-expiry" name="expiryDate" type="date"></p>
+                <button type="submit">建立收貨工作與箱標籤</button>
+            </form>
+            <section aria-labelledby="inbound-scan-title">
+                <h3 id="inbound-scan-title">入庫核對</h3>
+                <p>展示時可手動輸入代碼；實際 PDA 條碼掃描器會將掃描結果輸入欄位。</p>
+                <p>本次批號：<output id="inbound-lot">尚未建立</output></p>
+                <p>儲位代碼：<output id="inbound-location-code">—</output></p>
+                <p><label for="in-scan-location">掃描儲位代碼</label><input id="in-scan-location" autocomplete="off"></p>
+                <button id="in-verify-location" type="button" disabled>核對儲位</button>
+                <p><label for="in-scan-crate">掃描本箱條碼</label><input id="in-scan-crate" autocomplete="off"></p>
+                <button id="in-scan-crate-button" type="button" disabled>登記此箱</button>
+                <p id="inbound-progress" role="status">尚未建立收貨工作。</p>
+                <ul id="inbound-crate-codes"></ul>
+                <button id="inbound-confirm" type="button" disabled>確認入庫並更新庫存</button>
+                <button id="inbound-cancel" type="button" disabled>取消收貨工作</button>
+            </section>
+        </section>
 
+        <!-- [CORE MUST｜NO3 FIFO] 系統找出最早批次及位置；確認前逐箱核對，完成後扣除同批庫存。 -->
+        <section id="outbound" data-panel aria-labelledby="outbound-title" hidden>
+            <header><h2 id="outbound-title">出貨取貨</h2><p>建立取貨工作後，依畫面指示掃描儲位及每一箱蔬果。</p></header>
+            <!-- [BACKEND MUST｜大：3–5+ 人日] 出貨需求與 FIFO 批次須由後端原子保留；庫存不足、重複掃描或批次不符時拒絕出庫並記錄交易。 -->
+            <form id="outbound-form">
+                <p><label for="out-item">商品</label><select id="out-item" name="item" required><option value="">請選擇商品</option></select></p>
+                <p><label for="out-quantity">出貨箱數</label><input id="out-quantity" name="quantity" type="number" min="1" step="1" required></p>
+                <button type="submit">建立 FIFO 取貨工作</button>
+            </form>
+            <section aria-labelledby="pick-plan-title">
+                <h3 id="pick-plan-title">FIFO 取貨順序</h3>
+                <table><caption>由最早入庫批次開始</caption><thead><tr><th scope="col">順序</th><th scope="col">倉庫／儲位</th><th scope="col">批號／入庫時間</th><th scope="col">需取箱數</th><th scope="col">已掃箱數</th></tr></thead><tbody id="pick-plan-table"></tbody></table>
+                <p id="pick-next-instruction" role="status">尚未建立取貨工作。</p>
+            </section>
+            <section aria-labelledby="outbound-scan-title">
+                <h3 id="outbound-scan-title">取貨掃描確認</h3>
+                <p><label for="out-scan-location">掃描目前儲位代碼</label><input id="out-scan-location" autocomplete="off"></p>
+                <button id="out-verify-location" type="button" disabled>核對儲位</button>
+                <p><label for="out-scan-crate">掃描實際取出的箱條碼</label><input id="out-scan-crate" autocomplete="off"></p>
+                <button id="out-scan-crate-button" type="button" disabled>登記取出此箱</button>
+                <p id="outbound-progress" role="status">請先建立取貨工作。</p>
+                <ul id="outbound-scanned-list"></ul>
+                <button id="outbound-confirm" type="button" disabled>確認出庫並同步庫存</button>
+                <button id="outbound-cancel" type="button" disabled>取消取貨工作</button>
+            </section>
+        </section>
+
+        <!-- [CORE MUST｜NO2 每日盤點] 逐儲位核對實際數量、記錄差異原因並顯示今日完成進度。 -->
+        <section id="stocktake" data-panel aria-labelledby="stocktake-title" hidden>
+            <header><h2 id="stocktake-title">每日盤點</h2><p>建議每天完成一次。逐筆核對現場箱數；腐爛或短少請選擇原因。</p></header>
+            <!-- [BACKEND MUST] 每日盤點結果需保存日期、儲位、盤點人、盤點前後數量及原因；支援進度與未完成清單。 -->
+            <p>盤點日期：<time id="stocktake-date"></time></p>
+            <p id="stocktake-progress" role="status"></p>
+            <label for="count-warehouse">倉庫</label><select id="count-warehouse"><option value="all">全部倉庫</option><option value="1">倉庫 1</option><option value="2">倉庫 2</option></select>
+            <label for="count-search">搜尋商品／儲位</label><input id="count-search" type="search" placeholder="輸入關鍵字">
+            <table><caption>今日盤點清單</caption><thead><tr><th scope="col">狀態</th><th scope="col">倉庫／儲位</th><th scope="col">商品／批號</th><th scope="col">系統數量</th><th scope="col">實際數量</th><th scope="col">差異原因</th><th scope="col">操作</th></tr></thead><tbody id="count-table"></tbody></table>
+        </section>
+
+        <!-- [BACKEND] 正式版須保存安全水位、久放門檻並提供共用查詢；報廢統計可由異動 API 彙總。 -->
+        <section id="management" data-panel aria-labelledby="management-title" hidden>
+            <header><h2 id="management-title">管理設定</h2><p>以下是管理加分項目，可依專案時間完成。</p></header>
+            <form id="safety-form">
+                <h3>安全庫存</h3>
+                <label for="safety-item">商品</label><input id="safety-item" list="product-options" required>
+                <label for="safety-wh">倉庫</label><select id="safety-wh"><option value="1">倉庫 1</option><option value="2">倉庫 2</option></select>
+                <label for="safety-qty">低於此箱數時提醒</label><input id="safety-qty" type="number" min="0" step="1" required>
+                <button type="submit">儲存安全庫存</button>
+            </form>
+            <form id="aging-form">
+                <h3>久放提醒</h3>
+                <label for="aging-item">商品</label><input id="aging-item" list="product-options" required>
+                <label for="aging-days">存放幾天後提醒</label><input id="aging-days" type="number" min="1" step="1" required>
+                <button type="submit">儲存提醒天數</button>
+            </form>
+            <!-- [BACKEND OPTIONAL] 若採用正式帳號管理，需登入驗證及伺服器端角色權限；本頁人員名單僅供展示。 -->
+            <form id="user-form">
+                <h3>人員名單</h3>
+                <label for="user-name">姓名</label><input id="user-name" maxlength="60" required>
+                <label for="user-role">角色</label><select id="user-role"><option value="manager">管理者</option><option value="warehouse">倉管人員</option></select>
+                <button type="submit">新增人員</button>
+            </form>
+            <table><caption>人員名單</caption><thead><tr><th scope="col">姓名</th><th scope="col">角色</th></tr></thead><tbody id="user-table"></tbody></table>
+        </section>
+    </main>
+    <footer>
+        <!-- [BACKEND MUST｜NO1] 正式版須連共用資料庫；若員工可能繞過登記，須整合銷售流程或現場掃碼。僅有前端確認鈕無法偵測未登記的實體搬運。 -->
+    </footer>
 </body>
 </html>
