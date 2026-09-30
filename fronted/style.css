@@ -531,3 +531,22 @@ main section section {
 #management > table {
     margin-top: 28px;
 }
+
+/* 進貨、出貨表單內距 */
+#inbound form,
+#outbound form {
+    padding: 8px 20px 16px;
+}
+
+/* 表單標題與第一個欄位保持距離 */
+#inbound form h3,
+#outbound form h3 {
+    margin-bottom: 18px;
+}
+
+/* 表單欄位不要貼邊 */
+#inbound form p,
+#outbound form p {
+    margin-left: 0;
+    margin-right: 0;
+}
