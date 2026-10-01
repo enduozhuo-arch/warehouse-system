@@ -89,7 +89,7 @@
     renderDashboard();
     renderStocktake();
     renderManagement();
-    $("sync-state").textContent = "已連線後端 API";
+    $("sync-state").textContent = "已連線後端 API；庫存與異動紀錄由伺服器提供。";
   }
 
   function currentOperator() { return $("current-operator").value.trim(); }
@@ -103,13 +103,95 @@
 
   function refreshProductOptions() {
     const names = productNames();
-    $("product-options").innerHTML = names.map(name => '<option value="' + esc(name) + '"></option>').join("");
     const select = $("out-item");
     const previous = select.value;
     select.innerHTML = '<option value="">請選擇商品</option>' + names.map(name =>
       '<option value="' + esc(name) + '">' + esc(name) + "</option>"
     ).join("");
     if (names.includes(previous)) select.value = previous;
+  }
+
+  // 自訂商品建議清單：可用 CSS 調整外觀，也保留輸入清單外新商品的功能。
+  function setupProductAutocomplete() {
+    document.querySelectorAll("[data-product-autocomplete]").forEach(input => {
+      const list = $(input.getAttribute("aria-controls"));
+      let options = [];
+      let activeIndex = -1;
+
+      const close = () => {
+        list.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        input.removeAttribute("aria-activedescendant");
+        activeIndex = -1;
+      };
+
+      const choose = index => {
+        if (index < 0 || index >= options.length) return;
+        input.value = options[index];
+        close();
+        input.focus();
+      };
+
+      const render = () => {
+        const query = input.value.trim().toLocaleLowerCase();
+        options = productNames()
+          .filter(name => !query || name.toLocaleLowerCase().includes(query))
+          .slice(0, 8);
+        list.replaceChildren();
+        activeIndex = -1;
+
+        options.forEach((name, index) => {
+          const option = document.createElement("button");
+          option.type = "button";
+          option.className = "autocomplete-option";
+          option.id = input.id + "-suggestion-" + index;
+          option.setAttribute("role", "option");
+          option.setAttribute("aria-selected", "false");
+          option.textContent = name;
+          option.addEventListener("mousedown", event => event.preventDefault());
+          option.addEventListener("click", () => choose(index));
+          list.append(option);
+        });
+
+        list.hidden = options.length === 0;
+        input.setAttribute("aria-expanded", String(options.length > 0));
+      };
+
+      const moveActive = direction => {
+        if (list.hidden || options.length === 0) {
+          render();
+          if (list.hidden) return;
+        }
+        activeIndex = activeIndex < 0
+          ? (direction > 0 ? 0 : options.length - 1)
+          : (activeIndex + direction + options.length) % options.length;
+        const optionButtons = list.querySelectorAll('[role="option"]');
+        optionButtons.forEach((option, index) => {
+          const active = index === activeIndex;
+          option.setAttribute("aria-selected", String(active));
+          option.classList.toggle("is-active", active);
+        });
+        input.setAttribute("aria-activedescendant", input.id + "-suggestion-" + activeIndex);
+      };
+
+      input.addEventListener("focus", render);
+      input.addEventListener("input", render);
+      input.addEventListener("keydown", event => {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          moveActive(1);
+        } else if (event.key === "ArrowUp") {
+          event.preventDefault();
+          moveActive(-1);
+        } else if (event.key === "Enter" && !list.hidden && activeIndex >= 0) {
+          event.preventDefault();
+          choose(activeIndex);
+        } else if (event.key === "Escape") {
+          close();
+        }
+      });
+      input.addEventListener("blur", () => window.setTimeout(close, 120));
+    });
   }
 
   function expiryStatus(value) {
@@ -158,13 +240,20 @@
   }
 
   function renderActivity() {
-    const rows = state.transactions.slice(0, 30);
+    const selectedDate = $("activity-date").value;
+    const matchingRows = state.transactions.filter(tx =>
+      !selectedDate || String(tx.at || "").slice(0, 10) === selectedDate
+    );
+    const rows = selectedDate ? matchingRows : matchingRows.slice(0, 30);
+    $("activity-filter-status").textContent = selectedDate
+      ? selectedDate + "：共 " + matchingRows.length + " 筆異動紀錄。"
+      : "顯示最近 " + rows.length + " 筆異動紀錄。";
     $("activity-table").innerHTML = rows.length
       ? rows.map(tx => "<tr><td>" + esc(formatTime(tx.at)) + "</td><td>" + esc(tx.kind) + "</td><td>" +
         esc(tx.name) + "／" + warehouseName(tx.warehouse) + " " + esc(tx.bin) + "<br>" + esc(tx.lotNumber) +
         "</td><td>" + (Number(tx.quantity) > 0 ? "+" : "") + Number(tx.quantity) + " 箱</td><td>" +
         esc(tx.reason || "—") + "</td><td>" + esc(tx.operator) + "</td></tr>").join("")
-      : '<tr><td colspan="6">目前沒有異動紀錄。</td></tr>';
+      : '<tr><td colspan="6">' + (selectedDate ? "這一天沒有異動紀錄。" : "目前沒有異動紀錄。") + "</td></tr>";
   }
 
   function renderDashboard() {
@@ -491,17 +580,18 @@
         body: JSON.stringify({ name: name, role: role })
       });
       form.reset();
-      await finishAndReload("人員名單已新增。");
+      await finishAndReload("人員名單已新增至後端。");
     });
   });
 
   $("current-operator").addEventListener("change", () => {
     state.currentOperator = currentOperator();
     sessionStorage.setItem("zhunan-warehouse-operator", state.currentOperator);
-    announce("目前操作人已切換為 " + state.currentOperator);
+    announce("目前操作人已切換為 " + state.currentOperator + "。人員名單僅供異動標示，尚未登入驗證。");
   });
 
   async function switchTab(id) {
+    $("app-status").textContent = "";
     document.querySelectorAll("main > section[data-panel]").forEach(section => { section.hidden = section.id !== id; });
     document.querySelectorAll("button[data-tab]").forEach(button => {
       if (button.dataset.tab === id) button.setAttribute("aria-current", "page");
@@ -517,6 +607,18 @@
   document.querySelectorAll("button[data-tab]").forEach(button => {
     button.addEventListener("click", () => switchTab(button.dataset.tab));
   });
+  document.querySelectorAll("[data-return-home]").forEach(button => {
+    button.addEventListener("click", () => {
+      const confirmed = window.confirm("確定返回庫存總覽嗎？尚未送出的表單內容不會儲存；已建立的收貨或取貨工作會保留。");
+      if (confirmed) switchTab("dashboard");
+    });
+  });
+  $("activity-date").addEventListener("change", renderActivity);
+  $("activity-date-reset").addEventListener("click", () => {
+    $("activity-date").value = "";
+    renderActivity();
+  });
 
+  setupProductAutocomplete();
   run(loadData);
 })();

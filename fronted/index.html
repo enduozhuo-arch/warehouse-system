@@ -1,14 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <!-- 第三版：[CORE MUST] 對應老師 1.0／2.0 與維護 NO1–NO3；[V3 ADD] 為前端流程改善；[BACKEND CONNECTED] 表示已串接第二組 API；此檔不含 CSS。 -->
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="竹南冷凍倉儲管理系統">
     <title>竹南冷凍倉儲管理系統</title>
     <link rel="stylesheet" href="style.css">
     <script src="app.js" defer></script>
-
 </head>
 <body>
     <header>
@@ -27,13 +24,11 @@
     </nav>
 
     <main>
-        <!-- [CORE MUST｜雙倉庫狀況] 延續原版雙倉庫總覽，呈現異動後的庫存。 -->
         <section id="dashboard" data-panel aria-labelledby="dashboard-title">
             <header>
                 <h2 id="dashboard-title">庫存總覽</h2>
                 <p>資料更新時間：<time id="last-updated"></time></p>
             </header>
-            <!-- [V3 ADD｜簡便入口] 讓操作人從首頁直接進入主要工作，降低找錯頁或忘記登記的機會。 -->
             <section aria-labelledby="quick-title">
                 <h3 id="quick-title">常用作業</h3>
                 <button type="button" data-open-tab="inbound">登記進貨</button>
@@ -73,6 +68,12 @@
             <!-- [CORE MUST｜異動可追查] 原版近期紀錄保留；第三版記錄操作人、位置與批次。 -->
             <section aria-labelledby="activity-title">
                 <h3 id="activity-title">近期異動紀錄</h3>
+                <div class="activity-filter" role="group" aria-label="依日期查詢異動紀錄">
+                    <label for="activity-date">查看日期</label>
+                    <input id="activity-date" type="date">
+                    <button id="activity-date-reset" type="button" class="secondary-button">顯示全部</button>
+                </div>
+                <p id="activity-filter-status" role="status" aria-live="polite">預設顯示最近 30 筆異動紀錄。</p>
                 <table><caption>進貨、出貨、盤點與報廢紀錄</caption><thead><tr><th scope="col">時間</th><th scope="col">作業</th><th scope="col">商品／位置</th><th scope="col">數量</th><th scope="col">原因</th><th scope="col">操作人</th></tr></thead><tbody id="activity-table"></tbody></table>
             </section>
         </section>
@@ -82,7 +83,7 @@
             <header><h2 id="inbound-title">進貨入庫</h2></header>
             <!-- [BACKEND CONNECTED] 使用 /api/inbound-tasks；伺服器建立批號與箱號，確認入庫時記錄時間並更新庫存。 -->
             <form id="inbound-form">
-                <p><label for="in-item">商品名稱</label><input id="in-item" name="item" list="product-options" maxlength="80" required><datalist id="product-options"></datalist></p>
+                <p><label for="in-item">商品名稱</label><span class="autocomplete-control"><input id="in-item" name="item" data-product-autocomplete role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="in-item-suggestions" autocomplete="off" maxlength="80" required><span id="in-item-suggestions" class="autocomplete-options" role="listbox" hidden></span></span></p>
                 <p><label for="in-warehouse">存放倉庫</label><select id="in-warehouse" name="warehouse"><option value="1">倉庫 1</option><option value="2">倉庫 2</option></select></p>
                 <p><label for="in-bin">儲位</label><input id="in-bin" name="bin" maxlength="20" placeholder="例如 A-01" required></p>
                 <p><label for="in-quantity">預計入庫箱數</label><input id="in-quantity" name="quantity" type="number" min="1" step="1" value="2" required></p>
@@ -102,6 +103,7 @@
                 <button id="inbound-confirm" type="button" disabled>確認入庫並更新庫存</button>
                 <button id="inbound-cancel" type="button" disabled>取消收貨工作</button>
             </section>
+            <button type="button" class="return-home-button" data-return-home>回首頁</button>
         </section>
 
         <!-- [CORE MUST｜NO3 FIFO] 系統找出最早批次及位置；確認前逐箱核對，完成後扣除同批庫存。 -->
@@ -111,7 +113,7 @@
             <form id="outbound-form">
                 <p><label for="out-item">商品</label><select id="out-item" name="item" required><option value="">請選擇商品</option></select></p>
                 <p><label for="out-quantity">出貨箱數</label><input id="out-quantity" name="quantity" type="number" min="1" step="1" required></p>
-                <button type="submit">建立取貨工作</button>
+                <button type="submit">建立 FIFO 取貨工作</button>
             </form>
             <section aria-labelledby="pick-plan-title">
                 <h3 id="pick-plan-title">取貨順序</h3>
@@ -124,11 +126,16 @@
                 <button id="out-verify-location" type="button" disabled>核對儲位</button>
                 <p><label for="out-scan-crate">輸入或掃描實際取出的箱條碼</label><input id="out-scan-crate" autocomplete="off"></p>
                 <button id="out-scan-crate-button" type="button" disabled>登記取出此箱</button>
+                <details>
+                    <summary>沒有掃描器？查看目前批次的箱號</summary>
+                    <ul id="outbound-demo-crate-codes"><li>建立取貨工作後顯示。</li></ul>
+                </details>
                 <p id="outbound-progress" role="status">請先建立取貨工作。</p>
                 <ul id="outbound-scanned-list"></ul>
                 <button id="outbound-confirm" type="button" disabled>確認出庫並同步庫存</button>
                 <button id="outbound-cancel" type="button" disabled>取消取貨工作</button>
             </section>
+            <button type="button" class="return-home-button" data-return-home>回首頁</button>
         </section>
 
         <!-- [CORE MUST｜NO2 每日盤點] 逐儲位核對實際數量、記錄差異原因並顯示今日完成進度。 -->
@@ -140,33 +147,38 @@
             <label for="count-warehouse">倉庫</label><select id="count-warehouse"><option value="all">全部倉庫</option><option value="1">倉庫 1</option><option value="2">倉庫 2</option></select>
             <label for="count-search">搜尋商品／儲位</label><input id="count-search" type="search" placeholder="輸入關鍵字">
             <table><caption>今日盤點清單</caption><thead><tr><th scope="col">狀態</th><th scope="col">倉庫／儲位</th><th scope="col">商品／批號</th><th scope="col">系統數量</th><th scope="col">實際數量</th><th scope="col">差異原因</th><th scope="col">操作</th></tr></thead><tbody id="count-table"></tbody></table>
+            <button type="button" class="return-home-button" data-return-home>回首頁</button>
         </section>
 
+        <!-- [OPTIONAL] 保留第二版的安全庫存、久放及人員設定；核心出入庫與每日盤點不依賴這些設定。 -->
         <!-- [BACKEND CONNECTED] 安全庫存、久放門檻及報廢統計使用管理 API。 -->
         <section id="management" data-panel aria-labelledby="management-title" hidden>
             <header><h2 id="management-title">管理設定</h2></header>
             <form id="safety-form">
                 <h3>安全庫存</h3>
-                <label for="safety-item">商品</label><input id="safety-item" list="product-options" required>
+                <label for="safety-item">商品</label><span class="autocomplete-control"><input id="safety-item" data-product-autocomplete role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="safety-item-suggestions" autocomplete="off" required><span id="safety-item-suggestions" class="autocomplete-options" role="listbox" hidden></span></span>
                 <label for="safety-wh">倉庫</label><select id="safety-wh"><option value="1">倉庫 1</option><option value="2">倉庫 2</option></select>
                 <label for="safety-qty">低於此箱數時提醒</label><input id="safety-qty" type="number" min="0" step="1" required>
                 <button type="submit">儲存安全庫存</button>
             </form>
             <form id="aging-form">
                 <h3>久放提醒</h3>
-                <label for="aging-item">商品</label><input id="aging-item" list="product-options" required>
+                <label for="aging-item">商品</label><span class="autocomplete-control"><input id="aging-item" data-product-autocomplete role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="aging-item-suggestions" autocomplete="off" required><span id="aging-item-suggestions" class="autocomplete-options" role="listbox" hidden></span></span>
                 <label for="aging-days">存放幾天後提醒</label><input id="aging-days" type="number" min="1" step="1" required>
                 <button type="submit">儲存提醒天數</button>
             </form>
             <!-- [BACKEND OPTIONAL｜大：3–5+ 人日] 若採用正式帳號管理，需登入驗證及伺服器端角色權限；本頁人員名單僅供展示。 -->
             <form id="user-form">
-                <h3>人員名單</h3>
+
                 <label for="user-name">姓名</label><input id="user-name" maxlength="60" required>
                 <label for="user-role">角色</label><select id="user-role"><option value="manager">管理者</option><option value="warehouse">倉管人員</option></select>
                 <button type="submit">新增人員</button>
             </form>
             <table><caption>人員名單</caption><thead><tr><th scope="col">姓名</th><th scope="col">角色</th></tr></thead><tbody id="user-table"></tbody></table>
+            <button type="button" class="return-home-button" data-return-home>回首頁</button>
         </section>
+
+        <p id="app-status" role="status" aria-live="polite"></p>
     </main>
 </body>
 </html>
